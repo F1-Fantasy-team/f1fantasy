@@ -15,12 +15,14 @@ public class SeasonServiceIntegrationTests : IDisposable
     private readonly HttpClient _httpClient;
     private readonly SeasonRepository _seasonRepository;
     private readonly SeasonService _seasonService;
+    private readonly PaginationStateTracker _paginationState;
 
     public SeasonServiceIntegrationTests()
     {
         _httpClient = new HttpClient();
         _seasonRepository = new SeasonRepository();
-        _seasonService = new SeasonService(_httpClient, _seasonRepository);
+        _paginationState = new PaginationStateTracker();
+        _seasonService = new SeasonService(_httpClient, _seasonRepository, _paginationState);
     }
 
     [Fact]
