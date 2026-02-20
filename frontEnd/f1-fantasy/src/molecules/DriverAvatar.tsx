@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { getWikipediaImageUrl } from "../api/wikipediaImage";
 import { useDrivers } from "../state/useDriversAndConstructors";
 
 /** Stable background color from driver id (no external image needed). */
@@ -33,12 +35,28 @@ export function DriverAvatar({ driverId, size = 48, showName = true, className =
   const initials = getInitials(name);
   const bg = avatarColor(driverId);
 
+  const [resolvedImageUrl, setResolvedImageUrl] = useState<string | null>(null);
+  const imageUrl = driver?.imageUrl ?? resolvedImageUrl;
+
+  useEffect(() => {
+    if (!driver?.wikipediaUrl || driver.imageUrl) {
+      setResolvedImageUrl(null);
+      return;
+    }
+    setResolvedImageUrl(null);
+    let cancelled = false;
+    getWikipediaImageUrl(driver.wikipediaUrl).then((url) => {
+      if (!cancelled) setResolvedImageUrl(url);
+    });
+    return () => { cancelled = true; };
+  }, [driver?.wikipediaUrl, driver?.imageUrl]);
+
   return (
     <div className={`flex min-w-0 items-center gap-2 ${className}`}>
       <div
         role="img"
         aria-label={name}
-        className="shrink-0 rounded-full border border-f1-gray flex items-center justify-center font-semibold text-white select-none"
+        className="shrink-0 rounded-full border border-f1-gray flex items-center justify-center font-semibold text-white select-none overflow-hidden"
         style={{
           width: size,
           height: size,
@@ -46,7 +64,17 @@ export function DriverAvatar({ driverId, size = 48, showName = true, className =
           fontSize: Math.max(10, Math.floor(size * 0.4)),
         }}
       >
-        {initials}
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt=""
+            className="w-full h-full object-cover"
+            width={size}
+            height={size}
+          />
+        ) : (
+          initials
+        )}
       </div>
       {showName && <span className="min-w-0 truncate text-sm text-f1-silver">{name}</span>}
     </div>

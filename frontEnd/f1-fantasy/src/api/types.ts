@@ -5,7 +5,8 @@
 
 export interface DriverApi {
   driverId: string;
-  permanentNumber: string;
+  /** Race drivers have a number; reserves may omit or have empty. */
+  permanentNumber?: string;
   code: string;
   url: string;
   givenName: string;
