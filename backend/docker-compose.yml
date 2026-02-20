@@ -6,19 +6,22 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "5000:8080"
-      - "5001:8081"
+      - "10000:10000"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:10000
       - ConnectionStrings__DefaultConnection=${ConnectionStrings__DefaultConnection}
-      - DATABASE_URL=${DATABASE_URL}
-      - DB_PASSWORD=${DB_PASSWORD}
     env_file:
       - .env
+    volumes:
+      # Optional: Uncomment for hot-reload during development
+      # - ./F1Fantasy:/src/F1Fantasy
+      - ./.env:/src/.env
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+
+# Note: Render.com ignores this file and only uses the Dockerfile
+# This compose file is purely for local development with:
+# - Port 10000 (matching Render's default PORT)
+# - Development environment
+# - Automatic migrations via entrypoint script
+

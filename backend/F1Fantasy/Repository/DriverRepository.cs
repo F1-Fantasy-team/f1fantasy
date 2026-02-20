@@ -7,41 +7,80 @@ namespace F1Fantasy.Repository;
 public class DriverRepository
 {
     private readonly F1FantasyDbContext _context;
+    private readonly ILogger<DriverRepository> _logger;
 
-    public DriverRepository(F1FantasyDbContext context)
+    public DriverRepository(F1FantasyDbContext context, ILogger<DriverRepository> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     public async Task AddOrUpdateAsync(Driver driver)
     {
-        var existing = await _context.Drivers.FirstOrDefaultAsync(d => d.DriverId == driver.DriverId);
-        
-        if (existing != null)
+        try
         {
-            _context.Entry(existing).CurrentValues.SetValues(driver);
+            var existing = await _context.Drivers.FirstOrDefaultAsync(d => d.DriverId == driver.DriverId);
+            
+            if (existing != null)
+            {
+                _logger.LogDebug("Updating existing driver: {DriverId}", driver.DriverId);
+                _context.Entry(existing).CurrentValues.SetValues(driver);
+            }
+            else
+            {
+                _logger.LogDebug("Adding new driver: {DriverId}", driver.DriverId);
+                await _context.Drivers.AddAsync(driver);
+            }
+            
+            await _context.SaveChangesAsync();
         }
-        else
+        catch (Exception ex)
         {
-            await _context.Drivers.AddAsync(driver);
+            _logger.LogError(ex, "Error saving driver: {DriverId}", driver.DriverId);
+            throw;
         }
-        
-        await _context.SaveChangesAsync();
     }
 
     public async Task<Driver?> GetByDriverIdAsync(string driverId)
     {
-        return await _context.Drivers.FirstOrDefaultAsync(d => d.DriverId == driverId);
+        try
+        {
+            return await _context.Drivers.FirstOrDefaultAsync(d => d.DriverId == driverId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving driver: {DriverId}", driverId);
+            throw;
+        }
     }
 
     public async Task<IEnumerable<Driver>> GetAllAsync()
     {
-        return await _context.Drivers.OrderBy(d => d.FamilyName).ToListAsync();
+        try
+        {
+            var drivers = await _context.Drivers.OrderBy(d => d.FamilyName).ToListAsync();
+            _logger.LogDebug("Retrieved {Count} drivers from database", drivers.Count);
+            return drivers;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving all drivers from database");
+            throw;
+        }
     }
 
     public async Task ClearAsync()
     {
-        _context.Drivers.RemoveRange(_context.Drivers);
-        await _context.SaveChangesAsync();
+        try
+        {
+            _context.Drivers.RemoveRange(_context.Drivers);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Cleared all drivers from database");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error clearing drivers from database");
+            throw;
+        }
     }
 }

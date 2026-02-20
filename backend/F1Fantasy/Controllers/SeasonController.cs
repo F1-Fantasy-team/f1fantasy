@@ -9,15 +9,18 @@ namespace F1Fantasy.Controllers;
 public class SeasonController : ControllerBase
 {
     private readonly SeasonService _seasonService;
+    private readonly ILogger<SeasonController> _logger;
 
-    public SeasonController(SeasonService seasonService)
+    public SeasonController(SeasonService seasonService, ILogger<SeasonController> logger)
     {
         _seasonService = seasonService;
+        _logger = logger;
     }
 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Season>>> GetAllSeasons()
     {
+        _logger.LogInformation("GET /api/season - Fetching all seasons");
         var seasons = await _seasonService.GetAllSeasonsAsync();
         return Ok(seasons);
     }
@@ -25,6 +28,7 @@ public class SeasonController : ControllerBase
     [HttpGet("{year}")]
     public async Task<ActionResult<Season>> GetSeasonByYear(string year)
     {
+        _logger.LogInformation("GET /api/season/{Year} - Fetching season by year", year);
         var season = await _seasonService.GetSeasonByYearAsync(year);
         if (season == null)
         {
@@ -36,6 +40,7 @@ public class SeasonController : ControllerBase
     [HttpGet("cached")]
     public ActionResult<IEnumerable<Season>> GetCachedSeasons()
     {
+        _logger.LogInformation("GET /api/season/cached - Fetching cached seasons");
         var seasons = _seasonService.GetCachedSeasons();
         return Ok(seasons);
     }

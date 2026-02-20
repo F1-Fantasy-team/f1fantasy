@@ -9,14 +9,20 @@ public class DriverService
     private readonly ApiHttpClient _apiHttpClient;
     private readonly DriverRepository _driverRepository;
     private readonly PaginationStateTracker _paginationState;
+    private readonly ILogger<DriverService> _logger;
     private const string ApiBaseUrl = "https://api.jolpi.ca/ergast/f1";
     private const string StateKey = "drivers";
 
-    public DriverService(HttpClient httpClient, DriverRepository driverRepository, PaginationStateTracker paginationState)
+    public DriverService(
+        HttpClient httpClient, 
+        DriverRepository driverRepository, 
+        PaginationStateTracker paginationState,
+        ILogger<DriverService> logger)
     {
         _apiHttpClient = new ApiHttpClient(httpClient);
         _driverRepository = driverRepository;
         _paginationState = paginationState;
+        _logger = logger;
     }
 
     public async Task<IEnumerable<Driver>> GetAllDriversAsync()
@@ -24,7 +30,8 @@ public class DriverService
         // Check if we should fetch (incomplete or stale data)
         if (!_paginationState.ShouldFetch(StateKey))
         {
-            Console.WriteLine("Drivers data is complete and fresh. Returning cached data.");
+            _logger.LogInformation("Drivers data is complete and fresh. Returning {Count} cached drivers.", 
+                (await _driverRepository.GetAllAsync()).Count());
             return await _driverRepository.GetAllAsync();
         }
 
@@ -33,10 +40,13 @@ public class DriverService
         const int limit = 30;
         int total = 0;
 
+        _logger.LogInformation("Fetching drivers from API starting at offset {Offset}", offset);
+
         try
         {
             do
             {
+                _logger.LogDebug("Fetching drivers batch at offset {Offset}", offset);
                 var content = await _apiHttpClient.GetStringWithRetryAsync($"{ApiBaseUrl}/drivers/?offset={offset}");
                 var apiResponse = JsonSerializer.Deserialize<DriverApiResponse>(content, new JsonSerializerOptions
                 {
@@ -45,10 +55,13 @@ public class DriverService
 
                 if (apiResponse?.MRData?.DriverTable?.Drivers == null)
                 {
+                    _logger.LogWarning("API returned null or invalid response at offset {Offset}", offset);
                     break;
                 }
 
                 total = int.Parse(apiResponse.MRData.Total ?? "0");
+                _logger.LogDebug("Retrieved {Count} drivers in this batch. Total available: {Total}", 
+                    apiResponse.MRData.DriverTable.Drivers.Count, total);
 
                 // Store drivers in repository
                 foreach (var driver in apiResponse.MRData.DriverTable.Drivers)
@@ -67,6 +80,7 @@ public class DriverService
             if (offset >= total)
             {
                 _paginationState.MarkComplete(StateKey);
+                _logger.LogInformation("Successfully fetched all {Total} drivers from API", total);
             }
 
             // Return all data (including previously cached)
@@ -75,21 +89,33 @@ public class DriverService
         catch (HttpRequestException ex)
         {
             // If API fails, the state is already saved at last successful offset
-            Console.WriteLine($"API call failed for drivers at offset {offset}. State saved. Error: {ex.Message}");
+            _logger.LogError(ex, "API call failed for drivers at offset {Offset}. Will resume from this offset on next call.", offset);
             var cachedDrivers = (await _driverRepository.GetAllAsync()).ToList();
             
             // If we have partial data, it's already in repository
             if (cachedDrivers.Any())
             {
-                Console.WriteLine($"Returning {cachedDrivers.Count} cached drivers. Will resume from offset {_paginationState.GetNextOffset(StateKey)} on next call.");
+                _logger.LogWarning("Returning {Count} cached drivers. Will resume from offset {Offset} on next call.", 
+                    cachedDrivers.Count, _paginationState.GetNextOffset(StateKey));
+            }
+            else
+            {
+                _logger.LogError("No cached drivers available and API request failed");
             }
             
             return cachedDrivers;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error while fetching drivers");
+            throw;
         }
     }
 
     public async Task<IEnumerable<Driver>> GetDriversBySeasonAsync(string season)
     {
+        _logger.LogInformation("Fetching drivers for season {Season} from API", season);
+        
         try
         {
             var content = await _apiHttpClient.GetStringWithRetryAsync($"{ApiBaseUrl}/{season}/drivers/");
@@ -100,11 +126,13 @@ public class DriverService
 
             if (apiResponse?.MRData?.DriverTable?.Drivers == null)
             {
+                _logger.LogWarning("API returned null response for season {Season}. Falling back to cached data.", season);
                 // Fall back to all cached drivers (we don't track by season in repository)
                 return await _driverRepository.GetAllAsync();
             }
 
             var drivers = apiResponse.MRData.DriverTable.Drivers;
+            _logger.LogInformation("Retrieved {Count} drivers for season {Season} from API", drivers.Count, season);
 
             // Store in repository
             foreach (var driver in drivers)
@@ -114,39 +142,63 @@ public class DriverService
 
             return drivers;
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+            _logger.LogError(ex, "API call failed for drivers in season {Season}. Returning all cached drivers.", season);
             // If API fails completely (even after retries), fall back to all cached data
-            Console.WriteLine($"API call failed for drivers in season {season}. Returning all cached drivers.");
             return await _driverRepository.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error fetching drivers for season {Season}", season);
+            throw;
         }
     }
 
     public async Task<Driver?> GetDriverByIdAsync(string driverId)
     {
+        _logger.LogDebug("Looking up driver {DriverId} in cache", driverId);
+        
         // Check repository first
         var cachedDriver = await _driverRepository.GetByDriverIdAsync(driverId);
         if (cachedDriver != null)
         {
+            _logger.LogDebug("Driver {DriverId} found in cache", driverId);
             return cachedDriver;
         }
 
+        _logger.LogInformation("Driver {DriverId} not in cache. Fetching all drivers to update cache.", driverId);
+        
         try
         {
             // If not in repository, fetch all drivers (which will populate the repository)
             await GetAllDriversAsync();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+            _logger.LogError(ex, "API call failed while trying to find driver {DriverId}. No cached data available.", driverId);
             // API failed, but we already checked cache above, so return null
-            Console.WriteLine($"API call failed for driver {driverId}. No cached data available.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error while fetching driver {DriverId}", driverId);
+            throw;
         }
         
-        return await _driverRepository.GetByDriverIdAsync(driverId);
+        var driver = await _driverRepository.GetByDriverIdAsync(driverId);
+        if (driver == null)
+        {
+            _logger.LogWarning("Driver {DriverId} not found even after fetching all drivers", driverId);
+        }
+        
+        return driver;
     }
 
-    public async Task<IEnumerable<Driver>> GetCachedDrivers()
+    public async Task<IEnumerable<Driver>> GetCachedDriversAsync()
     {
-        return await _driverRepository.GetAllAsync();
+        _logger.LogDebug("Retrieving all cached drivers from repository");
+        var drivers = await _driverRepository.GetAllAsync();
+        _logger.LogInformation("Retrieved {Count} cached drivers", drivers.Count());
+        return drivers;
     }
 }

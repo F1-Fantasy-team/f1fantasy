@@ -1,5 +1,6 @@
 using DotNetEnv;
 using F1Fantasy.Data;
+using F1Fantasy.Middleware;
 using Microsoft.EntityFrameworkCore;
 
 // Load environment variables from .env file in development
@@ -15,6 +16,18 @@ if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development
 }
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure logging
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+builder.Logging.SetMinimumLevel(LogLevel.Information);
+
+// In development, enable more detailed logging
+if (builder.Environment.IsDevelopment())
+{
+    builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Information);
+}
 
 // Override configuration with environment variables
 var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
@@ -54,6 +67,9 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
+// Add global exception handler middleware
+app.UseMiddleware<GlobalExceptionHandler>();
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -70,5 +86,9 @@ if (app.Environment.IsDevelopment())
 app.UseAuthorization();
 
 app.MapControllers();
+
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+logger.LogInformation("F1Fantasy API starting up...");
+logger.LogInformation("Environment: {Environment}", app.Environment.EnvironmentName);
 
 app.Run();
