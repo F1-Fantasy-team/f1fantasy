@@ -1,0 +1,122 @@
+import { LockOutlined, UnlockOutlined } from "@ant-design/icons";
+import { useSetRecoilState } from "recoil";
+import { BackLink, InviteSection } from "../molecules";
+import { StandingsTable } from "../molecules/StandingsTable";
+import { RenderYourPredictions } from "../molecules/YourPredictionContent";
+import { F1Title, F1Text, F1Button } from "../atoms";
+import { selectedCategoryIdState } from "../state/atoms";
+import { SEASON_STARTED } from "../constants/season";
+import type { Group } from "../types/group";
+import type { GroupPredictionsData } from "../types/predictions";
+import type { PredictionCategoryId } from "../types/predictions";
+
+type GroupPredictionsViewProps = {
+  group: Group;
+  data: GroupPredictionsData;
+  setData: (data: GroupPredictionsData | ((prev: GroupPredictionsData) => GroupPredictionsData)) => void;
+  currentUserId: string;
+  currentUserDisplayName: string;
+};
+
+export function GroupPredictionsView({
+  group,
+  data,
+  setData,
+  currentUserId,
+  currentUserDisplayName: _currentUserDisplayName,
+}: GroupPredictionsViewProps) {
+  const setSelectedCategoryId = useSetRecoilState(selectedCategoryIdState);
+  const myStanding = data.standings.find((s) => s.userId === currentUserId);
+  const myPredictions = data.predictions.find((p) => p.userId === currentUserId);
+  const isLocked = (data.lockedUserIds ?? []).includes(currentUserId);
+  const canUnlock = isLocked && !SEASON_STARTED;
+
+  const handleLock = () => {
+    setData((prev) => ({
+      ...prev,
+      lockedUserIds: [...(prev.lockedUserIds ?? []), currentUserId],
+    }));
+  };
+
+  const handleUnlock = () => {
+    if (SEASON_STARTED) return;
+    setData((prev) => ({
+      ...prev,
+      lockedUserIds: (prev.lockedUserIds ?? []).filter((id) => id !== currentUserId),
+    }));
+  };
+
+  const handleCategoryClick = (categoryId: PredictionCategoryId) => {
+    setSelectedCategoryId(categoryId);
+  };
+
+  return (
+    <div className="min-w-0 space-y-6">
+      <BackLink />
+      <div className="min-w-0">
+        <F1Title level={3} className="!mb-1 !break-words !text-xl sm:!text-2xl">
+          {group.name}
+        </F1Title>
+        <F1Text muted className="text-sm">{group.memberCount} members</F1Text>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {isLocked ? (
+            <>
+              <F1Text muted className="text-sm">Predictions locked</F1Text>
+              {canUnlock && (
+                <F1Button type="default" size="small" icon={<UnlockOutlined />} onClick={handleUnlock}>
+                  Unlock predictions
+                </F1Button>
+              )}
+            </>
+          ) : (
+            <>
+              <F1Text muted className="text-sm">You can edit and lock your predictions below.</F1Text>
+              <F1Button type="primary" size="small" icon={<LockOutlined />} onClick={handleLock}>
+                Lock in predictions
+              </F1Button>
+            </>
+          )}
+        </div>
+        {import.meta.env.DEV && (
+          <div className="mt-3 rounded border border-amber-500/50 bg-amber-500/10 px-3 py-2">
+            <span className="mr-2 text-xs text-amber-200">Dev only (localhost):</span>
+            {isLocked ? (
+              <F1Button type="default" size="small" icon={<UnlockOutlined />} onClick={handleUnlock}>
+                Unlock my predictions
+              </F1Button>
+            ) : (
+              <F1Button type="default" size="small" icon={<LockOutlined />} onClick={handleLock}>
+                Lock my predictions
+              </F1Button>
+            )}
+          </div>
+        )}
+        <InviteSection group={group} />
+      </div>
+
+      <section>
+        <F1Title level={5} className="!mb-2">
+          Standings
+        </F1Title>
+        <StandingsTable standings={data.standings} currentUserId={currentUserId} />
+      </section>
+
+      <section>
+        <F1Title level={5} className="!mb-2">
+          Your predictions
+        </F1Title>
+        <F1Text muted className="block mb-3 text-sm">
+          Your picks and scores per category. Click a category to see your full prediction and compare with everyone else.
+        </F1Text>
+        <div className="grid gap-5 sm:grid-cols-1">
+          <RenderYourPredictions
+            predictions={myPredictions}
+            standing={myStanding}
+            onCategoryClick={handleCategoryClick}
+            showPredictionData={false}
+          />
+        </div>
+      </section>
+    </div>
+  );
+}
