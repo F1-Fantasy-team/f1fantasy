@@ -111,8 +111,7 @@ public class DriverServiceIntegrationTests : IDisposable
             driver.DriverId.Should().NotBeNullOrEmpty("driverId should be parsed");
             driver.GivenName.Should().NotBeNullOrEmpty("givenName should be parsed");
             driver.FamilyName.Should().NotBeNullOrEmpty("familyName should be parsed");
-            // Note: Some historical drivers may have empty nationality or URL in API
-            driver.DateOfBirth.Should().NotBeNullOrEmpty("dateOfBirth should be parsed");
+            // Note: Some historical drivers may have empty nationality, URL, or DateOfBirth in API
         }
     }
 

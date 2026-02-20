@@ -18,6 +18,7 @@ public class F1FantasyDbContext : DbContext
     public DbSet<Result> Results { get; set; }
     public DbSet<Qualifying> Qualifyings { get; set; }
     public DbSet<PitStop> PitStops { get; set; }
+    public DbSet<LapTiming> LapTimings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -210,6 +211,24 @@ public class F1FantasyDbContext : DbContext
             entity.HasIndex(p => new { p.Season, p.Round });
             entity.HasIndex(p => new { p.Season, p.Round, p.DriverId });
             entity.HasIndex(p => p.DriverId);
+        });
+
+        // LapTiming configuration
+        modelBuilder.Entity<LapTiming>(entity =>
+        {
+            entity.HasKey(l => l.Id);
+            entity.Property(l => l.Season).HasMaxLength(10).IsRequired();
+            entity.Property(l => l.Round).HasMaxLength(10).IsRequired();
+            entity.Property(l => l.LapNumber).HasMaxLength(10).IsRequired();
+            entity.Property(l => l.DriverId).HasMaxLength(100).IsRequired();
+            entity.Property(l => l.Position).HasMaxLength(10).IsRequired();
+            entity.Property(l => l.Time).HasMaxLength(20);
+            
+            // Index for common queries
+            entity.HasIndex(l => new { l.Season, l.Round });
+            entity.HasIndex(l => new { l.Season, l.Round, l.LapNumber });
+            entity.HasIndex(l => new { l.Season, l.Round, l.DriverId });
+            entity.HasIndex(l => l.DriverId);
         });
     }
 }
