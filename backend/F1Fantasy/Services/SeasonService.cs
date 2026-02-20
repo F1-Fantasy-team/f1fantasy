@@ -6,59 +6,92 @@ namespace F1Fantasy.Services;
 
 public class SeasonService
 {
-    private readonly HttpClient _httpClient;
+    private readonly ApiHttpClient _apiHttpClient;
     private readonly SeasonRepository _seasonRepository;
+    private readonly PaginationStateTracker _paginationState;
     private const string ApiBaseUrl = "https://api.jolpi.ca/ergast/f1";
+    private const string StateKey = "seasons";
 
-    public SeasonService(HttpClient httpClient, SeasonRepository seasonRepository)
+    public SeasonService(HttpClient httpClient, SeasonRepository seasonRepository, PaginationStateTracker paginationState)
     {
-        _httpClient = httpClient;
+        _apiHttpClient = new ApiHttpClient(httpClient);
         _seasonRepository = seasonRepository;
+        _paginationState = paginationState;
     }
 
     public async Task<IEnumerable<Season>> GetAllSeasonsAsync()
     {
-        var allSeasons = new List<Season>();
-        int offset = 0;
-        const int limit = 30;
-        int total;
-
-        do
+        // Check if we should fetch (incomplete or stale data)
+        if (!_paginationState.ShouldFetch(StateKey))
         {
-            var response = await _httpClient.GetAsync($"{ApiBaseUrl}/seasons/?offset={offset}");
-            response.EnsureSuccessStatusCode();
+            Console.WriteLine("Seasons data is complete and fresh. Returning cached data.");
+            return _seasonRepository.GetAll();
+        }
 
-            var content = await response.Content.ReadAsStringAsync();
-            var apiResponse = JsonSerializer.Deserialize<SeasonApiResponse>(content, new JsonSerializerOptions
+        var allSeasons = new List<Season>();
+        int offset = _paginationState.GetNextOffset(StateKey);
+        const int limit = 30;
+        int total = 0;
+
+        try
+        {
+            do
             {
-                PropertyNameCaseInsensitive = true
-            });
-
-            if (apiResponse?.MRData?.SeasonTable?.Seasons == null)
-            {
-                break;
-            }
-
-            total = int.Parse(apiResponse.MRData.Total ?? "0");
-
-            // Convert SeasonData to Season
-            foreach (var seasonData in apiResponse.MRData.SeasonTable.Seasons)
-            {
-                var season = new Season
+                var content = await _apiHttpClient.GetStringWithRetryAsync($"{ApiBaseUrl}/seasons/?offset={offset}");
+                var apiResponse = JsonSerializer.Deserialize<SeasonApiResponse>(content, new JsonSerializerOptions
                 {
-                    Year = seasonData.Season,
-                    Url = seasonData.Url
-                };
-                
-                allSeasons.Add(season);
-                _seasonRepository.AddOrUpdate(season);
+                    PropertyNameCaseInsensitive = true
+                });
+
+                if (apiResponse?.MRData?.SeasonTable?.Seasons == null)
+                {
+                    break;
+                }
+
+                total = int.Parse(apiResponse.MRData.Total ?? "0");
+
+                // Convert SeasonData to Season
+                foreach (var seasonData in apiResponse.MRData.SeasonTable.Seasons)
+                {
+                    var season = new Season
+                    {
+                        Year = seasonData.Season,
+                        Url = seasonData.Url
+                    };
+                    
+                    allSeasons.Add(season);
+                    _seasonRepository.AddOrUpdate(season);
+                }
+
+                // Update state after successful fetch
+                _paginationState.UpdateState(StateKey, offset, total);
+                offset += limit;
+
+            } while (offset < total);
+
+            // Mark as complete when we've fetched everything
+            if (offset >= total)
+            {
+                _paginationState.MarkComplete(StateKey);
             }
 
-            offset += limit;
-
-        } while (offset < total);
-
-        return allSeasons;
+            // Return all data (including previously cached)
+            return _seasonRepository.GetAll();
+        }
+        catch (HttpRequestException ex)
+        {
+            // If API fails, the state is already saved at last successful offset
+            Console.WriteLine($"API call failed for seasons at offset {offset}. State saved. Error: {ex.Message}");
+            var cachedSeasons = _seasonRepository.GetAll().ToList();
+            
+            // If we have partial data from before the failure, it's already in repository
+            if (cachedSeasons.Any())
+            {
+                Console.WriteLine($"Returning {cachedSeasons.Count} cached seasons. Will resume from offset {_paginationState.GetNextOffset(StateKey)} on next call.");
+            }
+            
+            return cachedSeasons;
+        }
     }
 
     public async Task<Season?> GetSeasonByYearAsync(string year)
@@ -70,8 +103,16 @@ public class SeasonService
             return cachedSeason;
         }
 
-        // If not in repository, fetch all seasons (which will populate the repository)
-        await GetAllSeasonsAsync();
+        try
+        {
+            // If not in repository, fetch all seasons (which will populate the repository)
+            await GetAllSeasonsAsync();
+        }
+        catch (HttpRequestException)
+        {
+            // API failed, but we already checked cache above, so return null
+            Console.WriteLine($"API call failed for season {year}. No cached data available.");
+        }
         
         return _seasonRepository.GetByYear(year);
     }

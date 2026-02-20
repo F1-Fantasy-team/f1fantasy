@@ -6,41 +6,48 @@ namespace F1Fantasy.Services;
 
 public class RaceService
 {
-    private readonly HttpClient _httpClient;
+    private readonly ApiHttpClient _apiHttpClient;
     private readonly RaceRepository _raceRepository;
     private const string ApiBaseUrl = "https://api.jolpi.ca/ergast/f1";
 
     public RaceService(HttpClient httpClient, RaceRepository raceRepository)
     {
-        _httpClient = httpClient;
+        _apiHttpClient = new ApiHttpClient(httpClient);
         _raceRepository = raceRepository;
     }
 
     public async Task<IEnumerable<Race>> GetRacesForSeasonAsync(string season)
     {
-        var response = await _httpClient.GetAsync($"{ApiBaseUrl}/{season}/races/");
-        response.EnsureSuccessStatusCode();
-
-        var content = await response.Content.ReadAsStringAsync();
-        var apiResponse = JsonSerializer.Deserialize<ApiResponse>(content, new JsonSerializerOptions
+        try
         {
-            PropertyNameCaseInsensitive = true
-        });
+            var content = await _apiHttpClient.GetStringWithRetryAsync($"{ApiBaseUrl}/{season}/races/");
+            var apiResponse = JsonSerializer.Deserialize<ApiResponse>(content, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
 
-        if (apiResponse?.MRData?.RaceTable?.Races == null)
-        {
-            return Enumerable.Empty<Race>();
+            if (apiResponse?.MRData?.RaceTable?.Races == null)
+            {
+                // Fall back to cached data if API returns unexpected response
+                return _raceRepository.GetBySeason(season);
+            }
+
+            var races = apiResponse.MRData.RaceTable.Races;
+            
+            // Store in repository
+            foreach (var race in races)
+            {
+                _raceRepository.AddOrUpdate(race);
+            }
+
+            return races;
         }
-
-        var races = apiResponse.MRData.RaceTable.Races;
-        
-        // Store in repository
-        foreach (var race in races)
+        catch (HttpRequestException)
         {
-            _raceRepository.AddOrUpdate(race);
+            // If API fails completely (even after retries), fall back to cached data
+            Console.WriteLine($"API call failed for season {season}. Returning cached data.");
+            return _raceRepository.GetBySeason(season);
         }
-
-        return races;
     }
 
     public async Task<Race?> GetRaceByRoundAsync(string season, string round)
