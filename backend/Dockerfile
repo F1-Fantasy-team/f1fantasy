@@ -28,16 +28,24 @@ EXPOSE 8081
 # Copy published app
 COPY --from=publish /app/publish .
 
-# Copy migration bundle (if you generate one, optional)
-# Alternatively, install dotnet-ef in runtime image
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
-
-# Install dotnet-ef tool in runtime for migrations
-RUN dotnet tool install --global dotnet-ef --version 10.0.0
+# Copy dotnet-ef tool from build stage
+COPY --from=build /root/.dotnet/tools /root/.dotnet/tools
 ENV PATH="$PATH:/root/.dotnet/tools"
 
 # Copy the entire project for migrations (needed for DbContext)
 COPY --from=build /src/F1Fantasy /src/F1Fantasy
+
+# Install .NET SDK in runtime stage (required for dotnet-ef to work)
+RUN apt-get update && \
+    apt-get install -y wget && \
+    wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh && \
+    chmod +x dotnet-install.sh && \
+    ./dotnet-install.sh --channel 10.0 && \
+    rm dotnet-install.sh && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV DOTNET_ROOT=/root/.dotnet
+ENV PATH="$PATH:/root/.dotnet"
 
 # Environment variables (override at runtime)
 ENV ASPNETCORE_URLS=http://+:8080 \
