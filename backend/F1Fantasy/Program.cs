@@ -4,6 +4,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<F1Fantasy.Repository.RaceRepository>();
 builder.Services.AddScoped<F1Fantasy.Services.RaceService>();
+builder.Services.AddScoped<F1Fantasy.Repository.SeasonRepository>();
+builder.Services.AddScoped<F1Fantasy.Services.SeasonService>();
 
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
