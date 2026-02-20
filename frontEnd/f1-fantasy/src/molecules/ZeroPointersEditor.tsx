@@ -32,8 +32,14 @@ export function ZeroPointersEditor({ value, onSave }: ZeroPointersEditorProps) {
           value={driverIds}
           onChange={(ids) => setDriverIds(ids.slice(0, maxDriverCount))}
           options={driverOptions}
-          className="w-full [&_.ant-select-selector]:bg-f1-gray [&_.ant-select-selector]:border-f1-gray [&_.ant-select-selection-item]:text-f1-silver"
+          className="w-full [&_.ant-select-selector]:bg-f1-gray [&_.ant-select-selector]:border-f1-gray [&_.ant-select-selection-item]:text-f1-silver f1-driver-select"
+          popupClassName="f1-driver-select-dropdown"
           maxTagCount="responsive"
+          showSearch
+          filterOption={(input, option) =>
+            (option?.label ?? "").toString().toLowerCase().includes(input.toLowerCase())
+          }
+          optionFilterProp="label"
         />
       </div>
       <F1Button type="primary" onClick={handleSave}>

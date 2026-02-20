@@ -3,7 +3,7 @@ import type { ConstructorApi } from "./types";
 import type { Constructor } from "../types/constructor";
 import { MOCK_CONSTRUCTORS } from "../data/mockConstructors";
 
-const CURRENT_SEASON = "2025";
+const CURRENT_SEASON = "2026";
 
 /** Map backend API shape to app Constructor (exported for tests). */
 export function mapConstructorApiToConstructor(api: ConstructorApi): Constructor {
@@ -14,15 +14,13 @@ export function mapConstructorApiToConstructor(api: ConstructorApi): Constructor
 }
 
 /**
- * Fetch constructors from backend. Returns null if API is not configured or request fails (caller should use mock).
+ * Fetch constructors for the current season from backend.
+ * Returns null if API is not configured or request fails (caller should use mock).
+ * Only uses season endpoint so we only display current-season constructors.
  */
 export async function fetchConstructorsFromApi(): Promise<Constructor[] | null> {
   if (!getApiBaseUrl()) return null;
   try {
-    const cached = await apiGet<ConstructorApi[]>("/api/constructor/cached");
-    if (Array.isArray(cached) && cached.length > 0) {
-      return cached.map(mapConstructorApiToConstructor);
-    }
     const bySeason = await apiGet<ConstructorApi[]>(`/api/constructor/season/${CURRENT_SEASON}`);
     if (Array.isArray(bySeason) && bySeason.length > 0) {
       return bySeason.map(mapConstructorApiToConstructor);
