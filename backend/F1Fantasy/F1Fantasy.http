@@ -1,0 +1,6 @@
+@F1Fantasy_HostAddress = http://localhost:5168
+
+GET {{F1Fantasy_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
