@@ -25,7 +25,7 @@ public class ConstructorService
         if (!_paginationState.ShouldFetch(StateKey))
         {
             Console.WriteLine("Constructors data is complete and fresh. Returning cached data.");
-            return _constructorRepository.GetAll();
+            return await _constructorRepository.GetAllAsync();
         }
 
         var allConstructors = new List<Constructor>();
@@ -54,7 +54,7 @@ public class ConstructorService
                 foreach (var constructor in apiResponse.MRData.ConstructorTable.Constructors)
                 {
                     allConstructors.Add(constructor);
-                    _constructorRepository.AddOrUpdate(constructor);
+                    await _constructorRepository.AddOrUpdateAsync(constructor);
                 }
 
                 // Update state after successful fetch
@@ -70,13 +70,13 @@ public class ConstructorService
             }
 
             // Return all data (including previously cached)
-            return _constructorRepository.GetAll();
+            return await _constructorRepository.GetAllAsync();
         }
         catch (HttpRequestException ex)
         {
             // If API fails, the state is already saved at last successful offset
             Console.WriteLine($"API call failed for constructors at offset {offset}. State saved. Error: {ex.Message}");
-            var cachedConstructors = _constructorRepository.GetAll().ToList();
+            var cachedConstructors = (await _constructorRepository.GetAllAsync()).ToList();
             
             // If we have partial data, it's already in repository
             if (cachedConstructors.Any())
@@ -101,7 +101,7 @@ public class ConstructorService
             if (apiResponse?.MRData?.ConstructorTable?.Constructors == null)
             {
                 // Fall back to all cached constructors (we don't track by season in repository)
-                return _constructorRepository.GetAll();
+                return await _constructorRepository.GetAllAsync();
             }
 
             var constructors = apiResponse.MRData.ConstructorTable.Constructors;
@@ -109,7 +109,7 @@ public class ConstructorService
             // Store in repository
             foreach (var constructor in constructors)
             {
-                _constructorRepository.AddOrUpdate(constructor);
+                await _constructorRepository.AddOrUpdateAsync(constructor);
             }
 
             return constructors;
@@ -118,14 +118,14 @@ public class ConstructorService
         {
             // If API fails completely (even after retries), fall back to all cached data
             Console.WriteLine($"API call failed for constructors in season {season}. Returning all cached constructors.");
-            return _constructorRepository.GetAll();
+            return await _constructorRepository.GetAllAsync();
         }
     }
 
     public async Task<Constructor?> GetConstructorByIdAsync(string constructorId)
     {
         // Check repository first
-        var cachedConstructor = _constructorRepository.GetByConstructorId(constructorId);
+        var cachedConstructor = await _constructorRepository.GetByConstructorIdAsync(constructorId);
         if (cachedConstructor != null)
         {
             return cachedConstructor;
@@ -142,11 +142,11 @@ public class ConstructorService
             Console.WriteLine($"API call failed for constructor {constructorId}. No cached data available.");
         }
         
-        return _constructorRepository.GetByConstructorId(constructorId);
+        return await _constructorRepository.GetByConstructorIdAsync(constructorId);
     }
 
-    public IEnumerable<Constructor> GetCachedConstructors()
+    public async Task<IEnumerable<Constructor>> GetCachedConstructors()
     {
-        return _constructorRepository.GetAll();
+        return await _constructorRepository.GetAllAsync();
     }
 }

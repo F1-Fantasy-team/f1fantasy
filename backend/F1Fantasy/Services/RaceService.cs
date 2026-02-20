@@ -29,7 +29,7 @@ public class RaceService
             if (apiResponse?.MRData?.RaceTable?.Races == null)
             {
                 // Fall back to cached data if API returns unexpected response
-                return _raceRepository.GetBySeason(season);
+                return await _raceRepository.GetBySeasonAsync(season);
             }
 
             var races = apiResponse.MRData.RaceTable.Races;
@@ -37,7 +37,7 @@ public class RaceService
             // Store in repository
             foreach (var race in races)
             {
-                _raceRepository.AddOrUpdate(race);
+                await _raceRepository.AddOrUpdateAsync(race);
             }
 
             return races;
@@ -46,17 +46,17 @@ public class RaceService
         {
             // If API fails completely (even after retries), fall back to cached data
             Console.WriteLine($"API call failed for season {season}. Returning cached data.");
-            return _raceRepository.GetBySeason(season);
+            return await _raceRepository.GetBySeasonAsync(season);
         }
     }
 
     public async Task<Race?> GetRaceByRoundAsync(string season, string round)
     {
-        return await Task.FromResult(_raceRepository.GetByRound(season, round));
+        return await _raceRepository.GetByRoundAsync(season, round);
     }
 
     public async Task<IEnumerable<Race>> GetAllRacesAsync()
     {
-        return await Task.FromResult(_raceRepository.GetAll());
+        return await _raceRepository.GetAllAsync();
     }
 }

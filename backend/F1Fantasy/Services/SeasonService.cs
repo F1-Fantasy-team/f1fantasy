@@ -25,7 +25,7 @@ public class SeasonService
         if (!_paginationState.ShouldFetch(StateKey))
         {
             Console.WriteLine("Seasons data is complete and fresh. Returning cached data.");
-            return _seasonRepository.GetAll();
+            return await _seasonRepository.GetAllAsync();
         }
 
         var allSeasons = new List<Season>();
@@ -60,7 +60,7 @@ public class SeasonService
                     };
                     
                     allSeasons.Add(season);
-                    _seasonRepository.AddOrUpdate(season);
+                    await _seasonRepository.AddOrUpdateAsync(season);
                 }
 
                 // Update state after successful fetch
@@ -76,13 +76,13 @@ public class SeasonService
             }
 
             // Return all data (including previously cached)
-            return _seasonRepository.GetAll();
+            return await _seasonRepository.GetAllAsync();
         }
         catch (HttpRequestException ex)
         {
             // If API fails, the state is already saved at last successful offset
             Console.WriteLine($"API call failed for seasons at offset {offset}. State saved. Error: {ex.Message}");
-            var cachedSeasons = _seasonRepository.GetAll().ToList();
+            var cachedSeasons = (await _seasonRepository.GetAllAsync()).ToList();
             
             // If we have partial data from before the failure, it's already in repository
             if (cachedSeasons.Any())
@@ -97,7 +97,7 @@ public class SeasonService
     public async Task<Season?> GetSeasonByYearAsync(string year)
     {
         // Check repository first
-        var cachedSeason = _seasonRepository.GetByYear(year);
+        var cachedSeason = await _seasonRepository.GetByYearAsync(year);
         if (cachedSeason != null)
         {
             return cachedSeason;
@@ -114,11 +114,11 @@ public class SeasonService
             Console.WriteLine($"API call failed for season {year}. No cached data available.");
         }
         
-        return _seasonRepository.GetByYear(year);
+        return await _seasonRepository.GetByYearAsync(year);
     }
 
-    public IEnumerable<Season> GetCachedSeasons()
+    public async Task<IEnumerable<Season>> GetCachedSeasons()
     {
-        return _seasonRepository.GetAll();
+        return await _seasonRepository.GetAllAsync();
     }
 }

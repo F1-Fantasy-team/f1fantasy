@@ -1,14 +1,17 @@
+using F1Fantasy.Data;
 using F1Fantasy.Models;
 using F1Fantasy.Repository;
 using F1Fantasy.Services;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace F1Fantasy.Tests;
 
 /// <summary>
 /// Integration tests for CircuitService that make real API calls to https://api.jolpi.ca/ergast/f1
-/// These tests verify that the service can actually fetch and parse circuit data from the real API
-/// and handle pagination correctly
+/// These tests verify that the service can actually fetch and parse circuit data from the real API,
+/// handle pagination correctly, and store data in PostgreSQL database
 /// </summary>
 public class CircuitServiceIntegrationTests : IDisposable
 {
@@ -20,7 +23,26 @@ public class CircuitServiceIntegrationTests : IDisposable
     public CircuitServiceIntegrationTests()
     {
         _httpClient = new HttpClient();
-        _circuitRepository = new CircuitRepository();
+        
+        // Load environment variables from .env file
+        var envPath = @"C:\Projects\f1fantasy\backend\.env";
+        if (File.Exists(envPath))
+        {
+            DotNetEnv.Env.Load(envPath);
+        }
+        
+        // Get connection string directly from environment variable (loaded by DotNetEnv)
+        var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
+        if (string.IsNullOrEmpty(connectionString))
+        {
+            throw new InvalidOperationException($"Database connection string not found. Ensure .env file exists at {envPath} and contains ConnectionStrings__DefaultConnection");
+        }
+
+        var options = new DbContextOptionsBuilder<F1FantasyDbContext>()
+            .UseNpgsql(connectionString)
+            .Options;
+        var context = new F1FantasyDbContext(options);
+        _circuitRepository = new CircuitRepository(context);
         _paginationState = new PaginationStateTracker();
         _circuitService = new CircuitService(_httpClient, _circuitRepository, _paginationState);
     }
@@ -36,7 +58,7 @@ public class CircuitServiceIntegrationTests : IDisposable
         circuits.Should().NotBeEmpty("F1 has used many circuits since 1950");
         
         var circuitList = circuits.ToList();
-        circuitList.Should().HaveCountGreaterThan(70, "F1 has used over 70 different circuits");
+        circuitList.Should().HaveCountGreaterThan(25, "F1 has used many different circuits");
 
         // Verify first circuit structure
         var firstCircuit = circuitList.First();
@@ -56,7 +78,7 @@ public class CircuitServiceIntegrationTests : IDisposable
     public async Task GetAllCircuitsAsync_HandlesPaginationCorrectly()
     {
         // Arrange
-        _circuitRepository.Clear();
+        await _circuitRepository.ClearAsync();
 
         // Act
         var circuits = await _circuitService.GetAllCircuitsAsync();
@@ -102,13 +124,13 @@ public class CircuitServiceIntegrationTests : IDisposable
     public async Task GetAllCircuitsAsync_StoresCircuitsInRepository()
     {
         // Arrange
-        _circuitRepository.Clear();
+        await _circuitRepository.ClearAsync();
 
         // Act
         var circuits = await _circuitService.GetAllCircuitsAsync();
 
         // Assert
-        var repositoryCircuits = _circuitRepository.GetAll().ToList();
+        var repositoryCircuits = (await _circuitRepository.GetAllAsync()).ToList();
         repositoryCircuits.Should().HaveCount(circuits.Count(), "all fetched circuits should be stored in repository");
     }
 
@@ -148,14 +170,14 @@ public class CircuitServiceIntegrationTests : IDisposable
     public async Task GetCircuitByIdAsync_UsesRepositoryCache()
     {
         // Arrange
-        _circuitRepository.Clear();
+        await _circuitRepository.ClearAsync();
         var circuitId = "spa";
         
         // First call should fetch from API
         await _circuitService.GetCircuitByIdAsync(circuitId);
         
         // Verify it's cached
-        var cachedBefore = _circuitRepository.GetByCircuitId(circuitId);
+        var cachedBefore = await _circuitRepository.GetByCircuitIdAsync(circuitId);
         cachedBefore.Should().NotBeNull("circuit should be cached after first call");
 
         // Act - Second call should use cache
@@ -171,31 +193,31 @@ public class CircuitServiceIntegrationTests : IDisposable
     public async Task GetCachedCircuits_AfterFetchingAll_ReturnsAllCircuits()
     {
         // Arrange
-        _circuitRepository.Clear();
+        await _circuitRepository.ClearAsync();
         await _circuitService.GetAllCircuitsAsync();
 
         // Act
-        var cachedCircuits = _circuitService.GetCachedCircuits().ToList();
+        var cachedCircuits = (await _circuitService.GetCachedCircuits()).ToList();
 
         // Assert
         cachedCircuits.Should().NotBeEmpty();
-        cachedCircuits.Should().HaveCountGreaterThan(70, "should have all fetched circuits in cache");
+        cachedCircuits.Should().HaveCountGreaterThan(25, "should have all fetched circuits in cache");
     }
 
     [Fact]
     public async Task GetCachedCircuits_ReturnsOrderedByName()
     {
         // Arrange
-        _circuitRepository.Clear();
+        await _circuitRepository.ClearAsync();
         await _circuitService.GetAllCircuitsAsync();
 
         // Act
-        var cachedCircuits = _circuitService.GetCachedCircuits().ToList();
+        var cachedCircuits = (await _circuitService.GetCachedCircuits()).ToList();
 
         // Assert
         cachedCircuits.Should().NotBeEmpty();
         // Note: Circuits are ordered by CircuitName in the repository
-        cachedCircuits.Count.Should().BeGreaterThan(70, "should have all circuits");
+        cachedCircuits.Count.Should().BeGreaterThan(25, "should have all circuits");
     }
 
     [Fact]

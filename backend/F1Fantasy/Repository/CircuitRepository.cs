@@ -1,33 +1,48 @@
+using F1Fantasy.Data;
 using F1Fantasy.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace F1Fantasy.Repository;
 
 public class CircuitRepository
 {
-    private readonly List<Circuit> _circuits = new();
+    private readonly F1FantasyDbContext _context;
 
-    public void AddOrUpdate(Circuit circuit)
+    public CircuitRepository(F1FantasyDbContext context)
     {
-        var existing = _circuits.FirstOrDefault(c => c.CircuitId == circuit.CircuitId);
+        _context = context;
+    }
+
+    public async Task AddOrUpdateAsync(Circuit circuit)
+    {
+        var existing = await _context.Circuits.FirstOrDefaultAsync(c => c.CircuitId == circuit.CircuitId);
+        
         if (existing != null)
         {
-            _circuits.Remove(existing);
+            _context.Entry(existing).CurrentValues.SetValues(circuit);
+            existing.Location = circuit.Location;
         }
-        _circuits.Add(circuit);
+        else
+        {
+            await _context.Circuits.AddAsync(circuit);
+        }
+        
+        await _context.SaveChangesAsync();
     }
 
-    public Circuit? GetByCircuitId(string circuitId)
+    public async Task<Circuit?> GetByCircuitIdAsync(string circuitId)
     {
-        return _circuits.FirstOrDefault(c => c.CircuitId == circuitId);
+        return await _context.Circuits.FirstOrDefaultAsync(c => c.CircuitId == circuitId);
     }
 
-    public IEnumerable<Circuit> GetAll()
+    public async Task<IEnumerable<Circuit>> GetAllAsync()
     {
-        return _circuits.OrderBy(c => c.CircuitName);
+        return await _context.Circuits.OrderBy(c => c.CircuitName).ToListAsync();
     }
 
-    public void Clear()
+    public async Task ClearAsync()
     {
-        _circuits.Clear();
+        _context.Circuits.RemoveRange(_context.Circuits);
+        await _context.SaveChangesAsync();
     }
 }
