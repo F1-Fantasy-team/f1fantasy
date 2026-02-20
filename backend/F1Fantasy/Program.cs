@@ -17,6 +17,13 @@ if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configure Kestrel to use Render.com's PORT environment variable
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenAnyIP(int.Parse(port));
+});
+
 // Configure logging
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
@@ -112,5 +119,6 @@ app.MapControllers();
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 logger.LogInformation("F1Fantasy API starting up...");
 logger.LogInformation("Environment: {Environment}", app.Environment.EnvironmentName);
+logger.LogInformation("Listening on port: {Port}", port);
 
 app.Run();
