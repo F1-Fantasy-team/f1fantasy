@@ -23,12 +23,13 @@ public class ResultRepository
                 .FirstOrDefaultAsync(r => 
                     r.Season == season && 
                     r.Round == round && 
-                    r.DriverId == result.DriverId);
+                    r.DriverId == result.DriverId &&
+                    r.IsSprint == result.IsSprint);
             
             if (existing != null)
             {
-                _logger.LogDebug("Updating existing result: Season {Season}, Round {Round}, Driver {DriverId}, Position {Position}", 
-                    season, round, result.DriverId, result.Position);
+                _logger.LogDebug("Updating existing {ResultType}: Season {Season}, Round {Round}, Driver {DriverId}, Position {Position}", 
+                    result.IsSprint ? "sprint result" : "race result", season, round, result.DriverId, result.Position);
                 
                 existing.Number = result.Number;
                 existing.Position = result.Position;
@@ -43,8 +44,8 @@ public class ResultRepository
             }
             else
             {
-                _logger.LogDebug("Adding new result: Season {Season}, Round {Round}, Driver {DriverId}, Position {Position}", 
-                    season, round, result.DriverId, result.Position);
+                _logger.LogDebug("Adding new {ResultType}: Season {Season}, Round {Round}, Driver {DriverId}, Position {Position}", 
+                    result.IsSprint ? "sprint result" : "race result", season, round, result.DriverId, result.Position);
                 
                 result.Season = season;
                 result.Round = round;
@@ -55,8 +56,8 @@ public class ResultRepository
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error saving result: Season {Season}, Round {Round}, Driver {DriverId}", 
-                season, round, result.DriverId);
+            _logger.LogError(ex, "Error saving {ResultType}: Season {Season}, Round {Round}, Driver {DriverId}", 
+                result.IsSprint ? "sprint result" : "race result", season, round, result.DriverId);
             throw;
         }
     }
@@ -65,7 +66,19 @@ public class ResultRepository
     {
         _logger.LogDebug("Fetching results for season {Season}", season);
         var results = await _context.Results
-            .Where(r => r.Season == season)
+            .Where(r => r.Season == season && !r.IsSprint)
+            .ToListAsync();
+        
+        return results
+            .OrderBy(r => int.Parse(r.Round))
+            .ThenBy(r => int.Parse(r.Position));
+    }
+
+    public async Task<IEnumerable<Result>> GetSprintResultsBySeasonAsync(string season)
+    {
+        _logger.LogDebug("Fetching sprint results for season {Season}", season);
+        var results = await _context.Results
+            .Where(r => r.Season == season && r.IsSprint)
             .ToListAsync();
         
         return results
@@ -77,7 +90,17 @@ public class ResultRepository
     {
         _logger.LogDebug("Fetching results for season {Season}, round {Round}", season, round);
         var results = await _context.Results
-            .Where(r => r.Season == season && r.Round == round)
+            .Where(r => r.Season == season && r.Round == round && !r.IsSprint)
+            .ToListAsync();
+        
+        return results.OrderBy(r => int.Parse(r.Position));
+    }
+
+    public async Task<IEnumerable<Result>> GetSprintResultsByRaceAsync(string season, string round)
+    {
+        _logger.LogDebug("Fetching sprint results for season {Season}, round {Round}", season, round);
+        var results = await _context.Results
+            .Where(r => r.Season == season && r.Round == round && r.IsSprint)
             .ToListAsync();
         
         return results.OrderBy(r => int.Parse(r.Position));

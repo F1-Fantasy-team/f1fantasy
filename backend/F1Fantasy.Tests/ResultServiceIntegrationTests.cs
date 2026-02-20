@@ -160,6 +160,92 @@ public class ResultServiceIntegrationTests : IDisposable
         await Task.Delay(1000); // Polite delay after test
     }
 
+    [Fact]
+    public async Task GetSprintResultsBySeasonAsync_FetchesAndParsesSprints()
+    {
+        // Arrange
+        var season = "2025";
+
+        // Act
+        var races = await _resultService.GetSprintResultsBySeasonAsync(season);
+
+        // Assert
+        races.Should().NotBeNull();
+        races.Should().NotBeEmpty("2025 season should have sprint races");
+        
+        var raceList = races.ToList();
+        raceList.Should().HaveCountGreaterThan(0, "2025 season has sprint races");
+
+        // Verify first sprint race structure
+        var firstRace = raceList.First();
+        firstRace.Season.Should().Be(season);
+        firstRace.Round.Should().NotBeNullOrEmpty();
+        firstRace.RaceName.Should().NotBeNullOrEmpty();
+        firstRace.SprintResults.Should().NotBeNull();
+        firstRace.SprintResults.Should().NotBeEmpty("sprint race should have results");
+
+        // Verify sprint result structure
+        var firstResult = firstRace.SprintResults!.First();
+        firstResult.Position.Should().Be("1", "first result should be P1");
+        firstResult.IsSprint.Should().BeTrue("result should be marked as sprint");
+        firstResult.Driver.Should().NotBeNull();
+        firstResult.Driver.DriverId.Should().NotBeNullOrEmpty();
+        firstResult.Constructor.Should().NotBeNull();
+        firstResult.Constructor.ConstructorId.Should().NotBeNullOrEmpty();
+        
+        await Task.Delay(1000); // Polite delay after test
+    }
+
+    [Fact]
+    public async Task GetSprintResultsByRaceAsync_FetchesSpecificSprintResults()
+    {
+        // Arrange
+        var season = "2025";
+        var round = "2"; // Chinese GP 2025 has sprint
+
+        // Act
+        var race = await _resultService.GetSprintResultsByRaceAsync(season, round);
+
+        // Assert
+        race.Should().NotBeNull();
+        race!.Season.Should().Be(season);
+        race.Round.Should().Be(round);
+        race.SprintResults.Should().NotBeNull();
+        race.SprintResults.Should().NotBeEmpty("Chinese GP 2025 sprint should have results");
+
+        // Verify sprint winner data
+        var winner = race.SprintResults!.First();
+        winner.Position.Should().Be("1");
+        winner.IsSprint.Should().BeTrue("result should be marked as sprint");
+        winner.Points.Should().Be("8", "sprint winner gets 8 points");
+        winner.Status.Should().Be("Finished", "winner should have finished");
+        
+        await Task.Delay(1000); // Polite delay after test
+    }
+
+    [Fact]
+    public async Task GetSprintResultsByRaceAsync_StoresSprintResultsInDatabase()
+    {
+        // Arrange
+        var season = "2025";
+        var round = "2";
+
+        // Act
+        await _resultService.GetSprintResultsByRaceAsync(season, round);
+        var cachedResults = await _resultRepository.GetSprintResultsByRaceAsync(season, round);
+
+        // Assert
+        cachedResults.Should().NotBeEmpty("sprint results should be cached in database");
+        
+        var cachedWinner = cachedResults.First();
+        cachedWinner.Position.Should().Be("1");
+        cachedWinner.Season.Should().Be(season);
+        cachedWinner.Round.Should().Be(round);
+        cachedWinner.IsSprint.Should().BeTrue("cached result should be marked as sprint");
+        
+        await Task.Delay(1000); // Polite delay after test
+    }
+
     public void Dispose()
     {
         _httpClient?.Dispose();

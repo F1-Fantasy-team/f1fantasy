@@ -131,9 +131,11 @@ public class F1FantasyDbContext : DbContext
             entity.Property(r => r.Grid).HasMaxLength(10);
             entity.Property(r => r.Laps).HasMaxLength(10);
             entity.Property(r => r.Status).HasMaxLength(100);
+            entity.Property(r => r.IsSprint).IsRequired().HasDefaultValue(false);
             
             // Index for common queries
             entity.HasIndex(r => new { r.Season, r.Round });
+            entity.HasIndex(r => new { r.Season, r.Round, r.IsSprint });
             entity.HasIndex(r => r.DriverId);
             entity.HasIndex(r => r.ConstructorId);
             

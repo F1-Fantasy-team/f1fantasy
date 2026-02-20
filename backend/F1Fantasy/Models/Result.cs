@@ -18,6 +18,7 @@ public class Result
     public string Status { get; set; } = string.Empty;
     public ResultTime? Time { get; set; }
     public FastestLap? FastestLap { get; set; }
+    public bool IsSprint { get; set; } = false; // Indicates if this is a sprint race result
 }
 
 public class ResultTime
@@ -78,4 +79,5 @@ public class RaceWithResults
     public string Date { get; set; } = string.Empty;
     public string Time { get; set; } = string.Empty;
     public List<Result>? Results { get; set; }
+    public List<Result>? SprintResults { get; set; } // Sprint race results
 }

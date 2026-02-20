@@ -115,4 +115,48 @@ public class ResultController : ControllerBase
             throw;
         }
     }
+
+    [HttpGet("season/{season}/sprint")]
+    public async Task<ActionResult<IEnumerable<RaceWithResults>>> GetSprintResultsBySeason(string season)
+    {
+        try
+        {
+            _logger.LogInformation("GET /api/result/season/{Season}/sprint - Fetching sprint results for season", season);
+            var results = await _resultService.GetSprintResultsBySeasonAsync(season);
+            _logger.LogInformation("Successfully retrieved sprint results for {Count} races in season {Season}", 
+                results.Count(), season);
+            return Ok(results);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching sprint results for season {Season}", season);
+            throw;
+        }
+    }
+
+    [HttpGet("season/{season}/round/{round}/sprint")]
+    public async Task<ActionResult<RaceWithResults>> GetSprintResultsByRace(string season, string round)
+    {
+        try
+        {
+            _logger.LogInformation("GET /api/result/season/{Season}/round/{Round}/sprint - Fetching sprint results for race", 
+                season, round);
+            var result = await _resultService.GetSprintResultsByRaceAsync(season, round);
+            
+            if (result == null)
+            {
+                _logger.LogWarning("No sprint results found for season {Season}, round {Round}", season, round);
+                return NotFound(new { message = $"No sprint results found for season {season}, round {round}" });
+            }
+            
+            _logger.LogInformation("Successfully retrieved {Count} sprint results for season {Season}, round {Round}", 
+                result.SprintResults?.Count ?? 0, season, round);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching sprint results for season {Season}, round {Round}", season, round);
+            throw;
+        }
+    }
 }

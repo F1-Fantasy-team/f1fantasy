@@ -167,6 +167,128 @@ public class ResultService
         return results;
     }
 
+    public async Task<IEnumerable<RaceWithResults>> GetSprintResultsBySeasonAsync(string season)
+    {
+        _logger.LogInformation("Fetching sprint results for season {Season} from API", season);
+        
+        try
+        {
+            var content = await _apiHttpClient.GetStringWithRetryAsync($"{ApiBaseUrl}/{season}/sprint/");
+            var apiResponse = JsonSerializer.Deserialize<ResultApiResponse>(content, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            if (apiResponse?.MRData?.RaceTable?.Races == null)
+            {
+                _logger.LogWarning("API returned null response for season {Season} sprint results. Falling back to cached data.", season);
+                return await BuildSprintResultsFromCache(season);
+            }
+
+            var races = apiResponse.MRData.RaceTable.Races;
+            _logger.LogInformation("Retrieved sprint results for {Count} races in season {Season} from API", races.Count, season);
+
+            // Store sprint results in repository
+            foreach (var race in races)
+            {
+                if (race.SprintResults != null)
+                {
+                    foreach (var result in race.SprintResults)
+                    {
+                        // Mark as sprint result
+                        result.IsSprint = true;
+                        // Populate IDs from nested objects
+                        result.DriverId = result.Driver?.DriverId ?? result.DriverId;
+                        result.ConstructorId = result.Constructor?.ConstructorId ?? result.ConstructorId;
+                        await _resultRepository.AddOrUpdateAsync(result, race.Season, race.Round);
+                    }
+                }
+            }
+
+            return races;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "API call failed for season {Season} sprint results. Returning cached data.", season);
+            return await BuildSprintResultsFromCache(season);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error fetching sprint results for season {Season}", season);
+            throw;
+        }
+    }
+
+    public async Task<RaceWithResults?> GetSprintResultsByRaceAsync(string season, string round)
+    {
+        _logger.LogInformation("Fetching sprint results for season {Season}, round {Round} from API", season, round);
+        
+        try
+        {
+            var content = await _apiHttpClient.GetStringWithRetryAsync($"{ApiBaseUrl}/{season}/{round}/sprint/");
+            var apiResponse = JsonSerializer.Deserialize<ResultApiResponse>(content, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            if (apiResponse?.MRData?.RaceTable?.Races == null || !apiResponse.MRData.RaceTable.Races.Any())
+            {
+                _logger.LogWarning("API returned no sprint results for season {Season}, round {Round}. Checking cache.", season, round);
+                var cachedResults = await _resultRepository.GetSprintResultsByRaceAsync(season, round);
+                if (cachedResults.Any())
+                {
+                    return new RaceWithResults
+                    {
+                        Season = season,
+                        Round = round,
+                        SprintResults = cachedResults.ToList()
+                    };
+                }
+                return null;
+            }
+
+            var race = apiResponse.MRData.RaceTable.Races.First();
+            _logger.LogInformation("Retrieved {Count} sprint results for season {Season}, round {Round} from API", 
+                race.SprintResults?.Count ?? 0, season, round);
+
+            // Store sprint results in repository
+            if (race.SprintResults != null)
+            {
+                foreach (var result in race.SprintResults)
+                {
+                    // Mark as sprint result
+                    result.IsSprint = true;
+                    // Populate IDs from nested objects
+                    result.DriverId = result.Driver?.DriverId ?? result.DriverId;
+                    result.ConstructorId = result.Constructor?.ConstructorId ?? result.ConstructorId;
+                    await _resultRepository.AddOrUpdateAsync(result, race.Season, race.Round);
+                }
+            }
+
+            return race;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "API call failed for season {Season}, round {Round} sprint results. Returning cached data.", season, round);
+            var cachedResults = await _resultRepository.GetSprintResultsByRaceAsync(season, round);
+            if (cachedResults.Any())
+            {
+                return new RaceWithResults
+                {
+                    Season = season,
+                    Round = round,
+                    SprintResults = cachedResults.ToList()
+                };
+            }
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error fetching sprint results for season {Season}, round {Round}", season, round);
+            throw;
+        }
+    }
+
     private async Task<IEnumerable<RaceWithResults>> BuildRaceWithResultsFromCache(string season)
     {
         var cachedResults = await _resultRepository.GetBySeasonAsync(season);
@@ -177,6 +299,19 @@ public class ResultService
             Season = g.Key.Season,
             Round = g.Key.Round,
             Results = g.ToList()
+        }).ToList();
+    }
+
+    private async Task<IEnumerable<RaceWithResults>> BuildSprintResultsFromCache(string season)
+    {
+        var cachedResults = await _resultRepository.GetSprintResultsBySeasonAsync(season);
+        var groupedByRace = cachedResults.GroupBy(r => new { r.Season, r.Round });
+
+        return groupedByRace.Select(g => new RaceWithResults
+        {
+            Season = g.Key.Season,
+            Round = g.Key.Round,
+            SprintResults = g.ToList()
         }).ToList();
     }
 }
