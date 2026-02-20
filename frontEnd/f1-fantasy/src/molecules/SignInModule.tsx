@@ -42,8 +42,11 @@ export function SignInModule() {
   }, []);
 
   return (
-    <F1Card className="w-full max-w-md flex-1 overflow-hidden" styles={{ body: { padding: 0 } }}>
-      <div className="min-w-0 overflow-x-hidden">
+    <F1Card
+      className="sign-in-card w-full min-w-0 max-w-md flex-1 shrink self-center md:self-auto"
+      styles={{ body: { padding: "1rem", overflow: "visible", background: "#1a1a1a" } }}
+    >
+      <div className="min-w-0 w-full sign-in-fill-card">
         <SignIn appearance={clerkF1Appearance} />
       </div>
     </F1Card>

@@ -5,6 +5,10 @@ import { useDrivers } from "../state/useDriversAndConstructors";
 
 export type TwoDriverValue = { driverId1: string; driverId2: string };
 
+const selectClass =
+  "w-full [&_.ant-select-selector]:bg-f1-gray [&_.ant-select-selector]:border-f1-gray [&_.ant-select-selection-item]:text-f1-silver f1-driver-select";
+const dropdownClass = "f1-driver-select-dropdown";
+
 type TwoDriverPickerProps = {
   value: TwoDriverValue | undefined;
   onSave: (prediction: TwoDriverValue) => void;
@@ -19,7 +23,7 @@ export function TwoDriverPicker({ value, onSave, labels = ["Driver 1", "Driver 2
   const [driverId2, setDriverId2] = useState(value?.driverId2 ?? "");
 
   const handleSave = () => {
-    if (driverId1 && driverId2) onSave({ driverId1, driverId2 });
+    if (driverId1 && driverId2 && driverId1 !== driverId2) onSave({ driverId1, driverId2 });
   };
 
   const isValid = Boolean(driverId1 && driverId2 && driverId1 !== driverId2);
@@ -34,8 +38,14 @@ export function TwoDriverPicker({ value, onSave, labels = ["Driver 1", "Driver 2
             value={driverId1 || undefined}
             onChange={setDriverId1}
             options={driverOptions}
-            className="w-full [&_.ant-select-selector]:bg-f1-gray [&_.ant-select-selector]:border-f1-gray [&_.ant-select-selection-item]:text-f1-silver"
+            className={selectClass}
+            popupClassName={dropdownClass}
             allowClear
+            showSearch
+            filterOption={(input, option) =>
+              (option?.label ?? "").toString().toLowerCase().includes(input.toLowerCase())
+            }
+            optionFilterProp="label"
           />
         </div>
         <div className="min-w-48">
@@ -48,14 +58,22 @@ export function TwoDriverPicker({ value, onSave, labels = ["Driver 1", "Driver 2
               ...opt,
               disabled: opt.value === driverId1,
             }))}
-            className="w-full [&_.ant-select-selector]:bg-f1-gray [&_.ant-select-selector]:border-f1-gray [&_.ant-select-selection-item]:text-f1-silver"
+            className={selectClass}
+            popupClassName={dropdownClass}
             allowClear
+            showSearch
+            filterOption={(input, option) =>
+              (option?.label ?? "").toString().toLowerCase().includes(input.toLowerCase())
+            }
+            optionFilterProp="label"
           />
         </div>
       </div>
-      <F1Button type="primary" onClick={handleSave} disabled={!isValid}>
-        Save prediction
-      </F1Button>
+      {isValid && (
+        <F1Button type="primary" onClick={handleSave}>
+          Save prediction
+        </F1Button>
+      )}
       {driverId1 && driverId2 && driverId1 === driverId2 && (
         <p className="text-xs text-amber-200">Pick two different drivers.</p>
       )}
