@@ -69,6 +69,8 @@ builder.Services.AddScoped<F1Fantasy.Repository.DriverRepository>();
 builder.Services.AddScoped<F1Fantasy.Services.DriverService>();
 builder.Services.AddScoped<F1Fantasy.Repository.ResultRepository>();
 builder.Services.AddScoped<F1Fantasy.Services.ResultService>();
+builder.Services.AddScoped<F1Fantasy.Repository.QualifyingRepository>();
+builder.Services.AddScoped<F1Fantasy.Services.QualifyingService>();
 
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi

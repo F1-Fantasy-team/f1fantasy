@@ -16,6 +16,7 @@ public class F1FantasyDbContext : DbContext
     public DbSet<Constructor> Constructors { get; set; }
     public DbSet<Driver> Drivers { get; set; }
     public DbSet<Result> Results { get; set; }
+    public DbSet<Qualifying> Qualifyings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -166,6 +167,30 @@ public class F1FantasyDbContext : DbContext
                     avgSpeed.Property(a => a.Speed).HasMaxLength(20);
                 });
             });
+        });
+
+        // Qualifying configuration
+        modelBuilder.Entity<Qualifying>(entity =>
+        {
+            entity.HasKey(q => q.Id);
+            entity.Property(q => q.Season).HasMaxLength(10).IsRequired();
+            entity.Property(q => q.Round).HasMaxLength(10).IsRequired();
+            entity.Property(q => q.Number).HasMaxLength(10);
+            entity.Property(q => q.Position).HasMaxLength(10);
+            entity.Property(q => q.DriverId).HasMaxLength(100).IsRequired();
+            entity.Property(q => q.ConstructorId).HasMaxLength(100).IsRequired();
+            entity.Property(q => q.Q1).HasMaxLength(20);
+            entity.Property(q => q.Q2).HasMaxLength(20);
+            entity.Property(q => q.Q3).HasMaxLength(20);
+            
+            // Index for common queries
+            entity.HasIndex(q => new { q.Season, q.Round });
+            entity.HasIndex(q => q.DriverId);
+            entity.HasIndex(q => q.ConstructorId);
+            
+            // Ignore navigation properties
+            entity.Ignore(q => q.Driver);
+            entity.Ignore(q => q.Constructor);
         });
     }
 }
