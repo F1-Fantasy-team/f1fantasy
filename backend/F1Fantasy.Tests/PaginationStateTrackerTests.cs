@@ -1,7 +1,9 @@
+using F1Fantasy.Data;
 using F1Fantasy.Models;
 using F1Fantasy.Repository;
 using F1Fantasy.Services;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 
 namespace F1Fantasy.Tests;
 
@@ -103,7 +105,11 @@ public class PaginationStateTrackerTests
 
         // Arrange
         var httpClient = new HttpClient();
-        var repository = new SeasonRepository();
+        var options = new DbContextOptionsBuilder<F1FantasyDbContext>()
+            .UseInMemoryDatabase(databaseName: "TestDb_" + Guid.NewGuid())
+            .Options;
+        var context = new F1FantasyDbContext(options);
+        var repository = new SeasonRepository(context);
         var tracker = new PaginationStateTracker();
         var service = new SeasonService(httpClient, repository, tracker);
 

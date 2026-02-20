@@ -1,33 +1,47 @@
+using F1Fantasy.Data;
 using F1Fantasy.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace F1Fantasy.Repository;
 
 public class ConstructorRepository
 {
-    private readonly List<Constructor> _constructors = new();
+    private readonly F1FantasyDbContext _context;
 
-    public void AddOrUpdate(Constructor constructor)
+    public ConstructorRepository(F1FantasyDbContext context)
     {
-        var existing = _constructors.FirstOrDefault(c => c.ConstructorId == constructor.ConstructorId);
+        _context = context;
+    }
+
+    public async Task AddOrUpdateAsync(Constructor constructor)
+    {
+        var existing = await _context.Constructors.FirstOrDefaultAsync(c => c.ConstructorId == constructor.ConstructorId);
+        
         if (existing != null)
         {
-            _constructors.Remove(existing);
+            _context.Entry(existing).CurrentValues.SetValues(constructor);
         }
-        _constructors.Add(constructor);
+        else
+        {
+            await _context.Constructors.AddAsync(constructor);
+        }
+        
+        await _context.SaveChangesAsync();
     }
 
-    public Constructor? GetByConstructorId(string constructorId)
+    public async Task<Constructor?> GetByConstructorIdAsync(string constructorId)
     {
-        return _constructors.FirstOrDefault(c => c.ConstructorId == constructorId);
+        return await _context.Constructors.FirstOrDefaultAsync(c => c.ConstructorId == constructorId);
     }
 
-    public IEnumerable<Constructor> GetAll()
+    public async Task<IEnumerable<Constructor>> GetAllAsync()
     {
-        return _constructors.OrderBy(c => c.Name);
+        return await _context.Constructors.OrderBy(c => c.Name).ToListAsync();
     }
 
-    public void Clear()
+    public async Task ClearAsync()
     {
-        _constructors.Clear();
+        _context.Constructors.RemoveRange(_context.Constructors);
+        await _context.SaveChangesAsync();
     }
 }

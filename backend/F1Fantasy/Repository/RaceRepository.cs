@@ -1,38 +1,63 @@
+using F1Fantasy.Data;
 using F1Fantasy.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace F1Fantasy.Repository;
 
 public class RaceRepository
 {
-    private readonly List<Race> _races = new();
+    private readonly F1FantasyDbContext _context;
 
-    public void AddOrUpdate(Race race)
+    public RaceRepository(F1FantasyDbContext context)
     {
-        var existing = _races.FirstOrDefault(r => r.Season == race.Season && r.Round == race.Round);
+        _context = context;
+    }
+
+    public async Task AddOrUpdateAsync(Race race)
+    {
+        var existing = await _context.Races
+            .FirstOrDefaultAsync(r => r.Season == race.Season && r.Round == race.Round);
+        
         if (existing != null)
         {
-            _races.Remove(existing);
+            _context.Entry(existing).CurrentValues.SetValues(race);
+            existing.Circuit = race.Circuit;
+            existing.FirstPractice = race.FirstPractice;
+            existing.SecondPractice = race.SecondPractice;
+            existing.ThirdPractice = race.ThirdPractice;
+            existing.Qualifying = race.Qualifying;
+            existing.Sprint = race.Sprint;
+            existing.SprintQualifying = race.SprintQualifying;
         }
-        _races.Add(race);
+        else
+        {
+            await _context.Races.AddAsync(race);
+        }
+        
+        await _context.SaveChangesAsync();
     }
 
-    public Race? GetByRound(string season, string round)
+    public async Task<Race?> GetByRoundAsync(string season, string round)
     {
-        return _races.FirstOrDefault(r => r.Season == season && r.Round == round);
+        return await _context.Races
+            .FirstOrDefaultAsync(r => r.Season == season && r.Round == round);
     }
 
-    public IEnumerable<Race> GetAll()
+    public async Task<IEnumerable<Race>> GetAllAsync()
     {
-        return _races;
+        return await _context.Races.ToListAsync();
     }
 
-    public IEnumerable<Race> GetBySeason(string season)
+    public async Task<IEnumerable<Race>> GetBySeasonAsync(string season)
     {
-        return _races.Where(r => r.Season == season);
+        return await _context.Races
+            .Where(r => r.Season == season)
+            .ToListAsync();
     }
 
-    public void Clear()
+    public async Task ClearAsync()
     {
-        _races.Clear();
+        _context.Races.RemoveRange(_context.Races);
+        await _context.SaveChangesAsync();
     }
 }

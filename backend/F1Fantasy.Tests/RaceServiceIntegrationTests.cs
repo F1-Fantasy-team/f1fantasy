@@ -1,13 +1,17 @@
+using F1Fantasy.Data;
 using F1Fantasy.Models;
 using F1Fantasy.Repository;
 using F1Fantasy.Services;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace F1Fantasy.Tests;
 
 /// <summary>
 /// Integration tests for RaceService that make real API calls to https://api.jolpi.ca/ergast/f1
 /// These tests verify that the service can actually fetch and parse data from the real API
+/// and store data in PostgreSQL database
 /// </summary>
 public class RaceServiceIntegrationTests : IDisposable
 {
@@ -18,7 +22,26 @@ public class RaceServiceIntegrationTests : IDisposable
     public RaceServiceIntegrationTests()
     {
         _httpClient = new HttpClient();
-        _raceRepository = new RaceRepository();
+        
+        // Load environment variables from .env file
+        var envPath = @"C:\Projects\f1fantasy\backend\.env";
+        if (File.Exists(envPath))
+        {
+            DotNetEnv.Env.Load(envPath);
+        }
+        
+        // Get connection string directly from environment variable (loaded by DotNetEnv)
+        var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
+        if (string.IsNullOrEmpty(connectionString))
+        {
+            throw new InvalidOperationException($"Database connection string not found. Ensure .env file exists at {envPath} and contains ConnectionStrings__DefaultConnection");
+        }
+
+        var options = new DbContextOptionsBuilder<F1FantasyDbContext>()
+            .UseNpgsql(connectionString)
+            .Options;
+        var context = new F1FantasyDbContext(options);
+        _raceRepository = new RaceRepository(context);
         _raceService = new RaceService(_httpClient, _raceRepository);
     }
 
@@ -91,13 +114,13 @@ public class RaceServiceIntegrationTests : IDisposable
     {
         // Arrange
         var season = "2024";
-        _raceRepository.Clear();
+        await _raceRepository.ClearAsync();
 
         // Act
         var races = await _raceService.GetRacesForSeasonAsync(season);
 
         // Assert
-        var repositoryRaces = _raceRepository.GetBySeason(season).ToList();
+        var repositoryRaces = (await _raceRepository.GetBySeasonAsync(season)).ToList();
         repositoryRaces.Should().HaveCount(races.Count(), "all fetched races should be stored in repository");
     }
 
@@ -149,7 +172,7 @@ public class RaceServiceIntegrationTests : IDisposable
     public async Task GetAllRacesAsync_AfterFetchingMultipleSeasons_ReturnsAllStoredRaces()
     {
         // Arrange
-        _raceRepository.Clear();
+        await _raceRepository.ClearAsync();
         await _raceService.GetRacesForSeasonAsync("2023");
         await _raceService.GetRacesForSeasonAsync("2024");
 

@@ -1,33 +1,47 @@
+using F1Fantasy.Data;
 using F1Fantasy.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace F1Fantasy.Repository;
 
 public class SeasonRepository
 {
-    private readonly List<Season> _seasons = new();
+    private readonly F1FantasyDbContext _context;
 
-    public void AddOrUpdate(Season season)
+    public SeasonRepository(F1FantasyDbContext context)
     {
-        var existing = _seasons.FirstOrDefault(s => s.Year == season.Year);
+        _context = context;
+    }
+
+    public async Task AddOrUpdateAsync(Season season)
+    {
+        var existing = await _context.Seasons.FirstOrDefaultAsync(s => s.Year == season.Year);
+        
         if (existing != null)
         {
-            _seasons.Remove(existing);
+            _context.Entry(existing).CurrentValues.SetValues(season);
         }
-        _seasons.Add(season);
+        else
+        {
+            await _context.Seasons.AddAsync(season);
+        }
+        
+        await _context.SaveChangesAsync();
     }
 
-    public Season? GetByYear(string year)
+    public async Task<Season?> GetByYearAsync(string year)
     {
-        return _seasons.FirstOrDefault(s => s.Year == year);
+        return await _context.Seasons.FirstOrDefaultAsync(s => s.Year == year);
     }
 
-    public IEnumerable<Season> GetAll()
+    public async Task<IEnumerable<Season>> GetAllAsync()
     {
-        return _seasons.OrderBy(s => s.Year);
+        return await _context.Seasons.OrderBy(s => s.Year).ToListAsync();
     }
 
-    public void Clear()
+    public async Task ClearAsync()
     {
-        _seasons.Clear();
+        _context.Seasons.RemoveRange(_context.Seasons);
+        await _context.SaveChangesAsync();
     }
 }

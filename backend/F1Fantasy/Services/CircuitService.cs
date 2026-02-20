@@ -25,7 +25,7 @@ public class CircuitService
         if (!_paginationState.ShouldFetch(StateKey))
         {
             Console.WriteLine("Circuits data is complete and fresh. Returning cached data.");
-            return _circuitRepository.GetAll();
+            return await _circuitRepository.GetAllAsync();
         }
 
         var allCircuits = new List<Circuit>();
@@ -54,7 +54,7 @@ public class CircuitService
                 foreach (var circuit in apiResponse.MRData.CircuitTable.Circuits)
                 {
                     allCircuits.Add(circuit);
-                    _circuitRepository.AddOrUpdate(circuit);
+                    await _circuitRepository.AddOrUpdateAsync(circuit);
                 }
 
                 // Update state after successful fetch
@@ -70,13 +70,13 @@ public class CircuitService
             }
 
             // Return all data (including previously cached)
-            return _circuitRepository.GetAll();
+            return await _circuitRepository.GetAllAsync();
         }
         catch (HttpRequestException ex)
         {
             // If API fails, the state is already saved at last successful offset
             Console.WriteLine($"API call failed for circuits at offset {offset}. State saved. Error: {ex.Message}");
-            var cachedCircuits = _circuitRepository.GetAll().ToList();
+            var cachedCircuits = (await _circuitRepository.GetAllAsync()).ToList();
             
             // If we have partial data, it's already in repository
             if (cachedCircuits.Any())
@@ -91,7 +91,7 @@ public class CircuitService
     public async Task<Circuit?> GetCircuitByIdAsync(string circuitId)
     {
         // Check repository first
-        var cachedCircuit = _circuitRepository.GetByCircuitId(circuitId);
+        var cachedCircuit = await _circuitRepository.GetByCircuitIdAsync(circuitId);
         if (cachedCircuit != null)
         {
             return cachedCircuit;
@@ -108,11 +108,11 @@ public class CircuitService
             Console.WriteLine($"API call failed for circuit {circuitId}. No cached data available.");
         }
         
-        return _circuitRepository.GetByCircuitId(circuitId);
+        return await _circuitRepository.GetByCircuitIdAsync(circuitId);
     }
 
-    public IEnumerable<Circuit> GetCachedCircuits()
+    public async Task<IEnumerable<Circuit>> GetCachedCircuits()
     {
-        return _circuitRepository.GetAll();
+        return await _circuitRepository.GetAllAsync();
     }
 }
