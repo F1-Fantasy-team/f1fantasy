@@ -17,6 +17,7 @@ public class F1FantasyDbContext : DbContext
     public DbSet<Driver> Drivers { get; set; }
     public DbSet<Result> Results { get; set; }
     public DbSet<Qualifying> Qualifyings { get; set; }
+    public DbSet<PitStop> PitStops { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -191,6 +192,24 @@ public class F1FantasyDbContext : DbContext
             // Ignore navigation properties
             entity.Ignore(q => q.Driver);
             entity.Ignore(q => q.Constructor);
+        });
+
+        // PitStop configuration
+        modelBuilder.Entity<PitStop>(entity =>
+        {
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.Season).HasMaxLength(10).IsRequired();
+            entity.Property(p => p.Round).HasMaxLength(10).IsRequired();
+            entity.Property(p => p.DriverId).HasMaxLength(100).IsRequired();
+            entity.Property(p => p.Lap).HasMaxLength(10).IsRequired();
+            entity.Property(p => p.Stop).HasMaxLength(10).IsRequired();
+            entity.Property(p => p.Time).HasMaxLength(20);
+            entity.Property(p => p.Duration).HasMaxLength(20);
+            
+            // Index for common queries
+            entity.HasIndex(p => new { p.Season, p.Round });
+            entity.HasIndex(p => new { p.Season, p.Round, p.DriverId });
+            entity.HasIndex(p => p.DriverId);
         });
     }
 }
