@@ -48,7 +48,8 @@ ENV DOTNET_ROOT=/root/.dotnet
 ENV PATH="$PATH:/root/.dotnet"
 
 # Environment variables (override at runtime)
-ENV ASPNETCORE_URLS=http://+:8080 \
+# Render.com uses PORT environment variable (defaults to 10000)
+ENV PORT=10000 \
     ASPNETCORE_ENVIRONMENT=Production
 
 # Entry point script to run migrations then start app
@@ -62,6 +63,11 @@ dotnet ef database update --no-build || echo "Migration failed or already up to 
 
 echo "Starting application..."
 cd /app
+
+# Bind to 0.0.0.0 on the PORT specified by Render (defaults to 10000)
+export ASPNETCORE_URLS="http://0.0.0.0:\${PORT:-10000}"
+echo "Binding to \$ASPNETCORE_URLS"
+
 exec dotnet F1Fantasy.dll
 EOF
 

@@ -64,7 +64,8 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseHttpsRedirection();
+// HTTPS redirection disabled - Render.com handles SSL/TLS at proxy level
+// app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
