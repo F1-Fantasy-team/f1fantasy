@@ -5,6 +5,7 @@ using F1Fantasy.Services;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace F1Fantasy.Tests;
 
@@ -43,9 +44,9 @@ public class DriverServiceIntegrationTests : IDisposable
             .UseNpgsql(connectionString)
             .Options;
         var context = new F1FantasyDbContext(options);
-        _driverRepository = new DriverRepository(context);
+        _driverRepository = new DriverRepository(context, NullLogger<DriverRepository>.Instance);
         _paginationState = new PaginationStateTracker();
-        _driverService = new DriverService(_httpClient, _driverRepository, _paginationState);
+        _driverService = new DriverService(_httpClient, _driverRepository, _paginationState, NullLogger<DriverService>.Instance);
     }
 
     [Fact]
@@ -196,7 +197,7 @@ public class DriverServiceIntegrationTests : IDisposable
         await _driverService.GetAllDriversAsync();
 
         // Act
-        var cachedDrivers = (await _driverService.GetCachedDrivers()).ToList();
+        var cachedDrivers = (await _driverService.GetCachedDriversAsync()).ToList();
 
         // Assert
         cachedDrivers.Should().NotBeEmpty();

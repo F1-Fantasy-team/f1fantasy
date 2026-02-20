@@ -5,6 +5,7 @@ using F1Fantasy.Services;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace F1Fantasy.Tests;
 
@@ -41,8 +42,8 @@ public class RaceServiceIntegrationTests : IDisposable
             .UseNpgsql(connectionString)
             .Options;
         var context = new F1FantasyDbContext(options);
-        _raceRepository = new RaceRepository(context);
-        _raceService = new RaceService(_httpClient, _raceRepository);
+        _raceRepository = new RaceRepository(context, NullLogger<RaceRepository>.Instance);
+        _raceService = new RaceService(_httpClient, _raceRepository, NullLogger<RaceService>.Instance);
     }
 
     [Fact]

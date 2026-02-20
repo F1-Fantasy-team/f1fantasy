@@ -15,6 +15,7 @@ public class F1FantasyDbContext : DbContext
     public DbSet<Circuit> Circuits { get; set; }
     public DbSet<Constructor> Constructors { get; set; }
     public DbSet<Driver> Drivers { get; set; }
+    public DbSet<Result> Results { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -112,6 +113,56 @@ public class F1FantasyDbContext : DbContext
             {
                 session.Property(s => s.Date).HasMaxLength(50);
                 session.Property(s => s.Time).HasMaxLength(50);
+            });
+        });
+
+        // Result configuration
+        modelBuilder.Entity<Result>(entity =>
+        {
+            entity.HasKey(r => r.Id);
+            entity.Property(r => r.Season).HasMaxLength(10).IsRequired();
+            entity.Property(r => r.Round).HasMaxLength(10).IsRequired();
+            entity.Property(r => r.Number).HasMaxLength(10);
+            entity.Property(r => r.Position).HasMaxLength(10);
+            entity.Property(r => r.PositionText).HasMaxLength(10);
+            entity.Property(r => r.Points).HasMaxLength(10);
+            entity.Property(r => r.DriverId).HasMaxLength(100).IsRequired();
+            entity.Property(r => r.ConstructorId).HasMaxLength(100).IsRequired();
+            entity.Property(r => r.Grid).HasMaxLength(10);
+            entity.Property(r => r.Laps).HasMaxLength(10);
+            entity.Property(r => r.Status).HasMaxLength(100);
+            
+            // Index for common queries
+            entity.HasIndex(r => new { r.Season, r.Round });
+            entity.HasIndex(r => r.DriverId);
+            entity.HasIndex(r => r.ConstructorId);
+            
+            // Ignore navigation properties - we don't want to load full driver/constructor objects
+            entity.Ignore(r => r.Driver);
+            entity.Ignore(r => r.Constructor);
+            
+            // Owned entities for nested objects
+            entity.OwnsOne(r => r.Time, time =>
+            {
+                time.Property(t => t.Millis).HasMaxLength(50);
+                time.Property(t => t.Time).HasMaxLength(50);
+            });
+            
+            entity.OwnsOne(r => r.FastestLap, fastestLap =>
+            {
+                fastestLap.Property(f => f.Rank).HasMaxLength(10);
+                fastestLap.Property(f => f.Lap).HasMaxLength(10);
+                
+                fastestLap.OwnsOne(f => f.Time, lapTime =>
+                {
+                    lapTime.Property(t => t.Time).HasMaxLength(50);
+                });
+                
+                fastestLap.OwnsOne(f => f.AverageSpeed, avgSpeed =>
+                {
+                    avgSpeed.Property(a => a.Units).HasMaxLength(10);
+                    avgSpeed.Property(a => a.Speed).HasMaxLength(20);
+                });
             });
         });
     }

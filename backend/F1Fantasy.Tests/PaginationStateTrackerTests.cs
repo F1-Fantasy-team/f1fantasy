@@ -4,6 +4,7 @@ using F1Fantasy.Repository;
 using F1Fantasy.Services;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace F1Fantasy.Tests;
 
@@ -111,7 +112,8 @@ public class PaginationStateTrackerTests
         var context = new F1FantasyDbContext(options);
         var repository = new SeasonRepository(context);
         var tracker = new PaginationStateTracker();
-        var service = new SeasonService(httpClient, repository, tracker);
+        var logger = NullLogger<SeasonService>.Instance;
+        var service = new SeasonService(httpClient, repository, tracker, logger);
 
         // First call - will fetch all data successfully
         var seasons1 = await service.GetAllSeasonsAsync();

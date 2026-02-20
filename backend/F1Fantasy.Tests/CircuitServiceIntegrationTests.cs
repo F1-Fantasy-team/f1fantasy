@@ -5,6 +5,7 @@ using F1Fantasy.Services;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace F1Fantasy.Tests;
 
@@ -44,7 +45,7 @@ public class CircuitServiceIntegrationTests : IDisposable
         var context = new F1FantasyDbContext(options);
         _circuitRepository = new CircuitRepository(context);
         _paginationState = new PaginationStateTracker();
-        _circuitService = new CircuitService(_httpClient, _circuitRepository, _paginationState);
+        _circuitService = new CircuitService(_httpClient, _circuitRepository, _paginationState, NullLogger<CircuitService>.Instance);
     }
 
     [Fact]
@@ -197,7 +198,7 @@ public class CircuitServiceIntegrationTests : IDisposable
         await _circuitService.GetAllCircuitsAsync();
 
         // Act
-        var cachedCircuits = (await _circuitService.GetCachedCircuits()).ToList();
+        var cachedCircuits = (await _circuitService.GetCachedCircuitsAsync()).ToList();
 
         // Assert
         cachedCircuits.Should().NotBeEmpty();
@@ -212,7 +213,7 @@ public class CircuitServiceIntegrationTests : IDisposable
         await _circuitService.GetAllCircuitsAsync();
 
         // Act
-        var cachedCircuits = (await _circuitService.GetCachedCircuits()).ToList();
+        var cachedCircuits = (await _circuitService.GetCachedCircuitsAsync()).ToList();
 
         // Assert
         cachedCircuits.Should().NotBeEmpty();

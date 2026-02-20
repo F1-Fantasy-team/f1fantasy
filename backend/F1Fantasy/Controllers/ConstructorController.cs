@@ -46,10 +46,29 @@ public class ConstructorController : ControllerBase
     }
 
     [HttpGet("cached")]
-    public ActionResult<IEnumerable<Constructor>> GetCachedConstructors()
+    public async Task<ActionResult<IEnumerable<Constructor>>> GetCachedConstructors()
     {
-        _logger.LogInformation("GET /api/constructor/cached - Fetching cached constructors");
-        var constructors = _constructorService.GetCachedConstructors();
-        return Ok(constructors);
+        try
+        {
+            _logger.LogInformation("GET /api/constructor/cached - Fetching cached constructors");
+            var constructors = await _constructorService.GetCachedConstructorsAsync();
+            
+            if (!constructors.Any())
+            {
+                _logger.LogWarning("No cached constructors found. Database may be empty.");
+                return Ok(new { 
+                    message = "No cached constructors found. Try calling /api/constructor first to populate the cache.",
+                    constructors = constructors 
+                });
+            }
+            
+            _logger.LogInformation("Successfully retrieved {Count} cached constructors", constructors.Count());
+            return Ok(constructors);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching cached constructors");
+            throw;
+        }
     }
 }

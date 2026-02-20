@@ -5,6 +5,7 @@ using F1Fantasy.Services;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace F1Fantasy.Tests;
 
@@ -44,7 +45,7 @@ public class SeasonServiceIntegrationTests : IDisposable
         var context = new F1FantasyDbContext(options);
         _seasonRepository = new SeasonRepository(context);
         _paginationState = new PaginationStateTracker();
-        _seasonService = new SeasonService(_httpClient, _seasonRepository, _paginationState);
+        _seasonService = new SeasonService(_httpClient, _seasonRepository, _paginationState, NullLogger<SeasonService>.Instance);
     }
 
     [Fact]
@@ -190,7 +191,7 @@ public class SeasonServiceIntegrationTests : IDisposable
         await _seasonService.GetAllSeasonsAsync();
 
         // Act
-        var cachedSeasons = (await _seasonService.GetCachedSeasons()).ToList();
+        var cachedSeasons = (await _seasonService.GetCachedSeasonsAsync()).ToList();
 
         // Assert
         cachedSeasons.Should().NotBeEmpty();
@@ -205,7 +206,7 @@ public class SeasonServiceIntegrationTests : IDisposable
         await _seasonService.GetAllSeasonsAsync();
 
         // Act
-        var cachedSeasons = (await _seasonService.GetCachedSeasons()).ToList();
+        var cachedSeasons = (await _seasonService.GetCachedSeasonsAsync()).ToList();
 
         // Assert
         cachedSeasons.Should().NotBeEmpty();

@@ -38,10 +38,29 @@ public class SeasonController : ControllerBase
     }
 
     [HttpGet("cached")]
-    public ActionResult<IEnumerable<Season>> GetCachedSeasons()
+    public async Task<ActionResult<IEnumerable<Season>>> GetCachedSeasons()
     {
-        _logger.LogInformation("GET /api/season/cached - Fetching cached seasons");
-        var seasons = _seasonService.GetCachedSeasons();
-        return Ok(seasons);
+        try
+        {
+            _logger.LogInformation("GET /api/season/cached - Fetching cached seasons");
+            var seasons = await _seasonService.GetCachedSeasonsAsync();
+            
+            if (!seasons.Any())
+            {
+                _logger.LogWarning("No cached seasons found. Database may be empty.");
+                return Ok(new { 
+                    message = "No cached seasons found. Try calling /api/season first to populate the cache.",
+                    seasons = seasons 
+                });
+            }
+            
+            _logger.LogInformation("Successfully retrieved {Count} cached seasons", seasons.Count());
+            return Ok(seasons);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching cached seasons");
+            throw;
+        }
     }
 }

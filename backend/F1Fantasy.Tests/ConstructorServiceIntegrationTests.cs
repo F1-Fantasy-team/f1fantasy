@@ -5,6 +5,7 @@ using F1Fantasy.Services;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace F1Fantasy.Tests;
 
@@ -44,7 +45,7 @@ public class ConstructorServiceIntegrationTests : IDisposable
         var context = new F1FantasyDbContext(options);
         _constructorRepository = new ConstructorRepository(context);
         _paginationState = new PaginationStateTracker();
-        _constructorService = new ConstructorService(_httpClient, _constructorRepository, _paginationState);
+        _constructorService = new ConstructorService(_httpClient, _constructorRepository, _paginationState, NullLogger<ConstructorService>.Instance);
     }
 
     [Fact]
@@ -186,7 +187,7 @@ public class ConstructorServiceIntegrationTests : IDisposable
         await _constructorService.GetAllConstructorsAsync();
 
         // Act
-        var cachedConstructors = (await _constructorService.GetCachedConstructors()).ToList();
+        var cachedConstructors = (await _constructorService.GetCachedConstructorsAsync()).ToList();
 
         // Assert
         cachedConstructors.Should().NotBeEmpty();

@@ -4,6 +4,7 @@ using F1Fantasy.Repository;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace F1Fantasy.Tests;
 
@@ -53,11 +54,11 @@ public class DatabaseIntegrationTests : IAsyncLifetime
         await _context.Database.MigrateAsync();
 
         // Initialize repositories
-        _raceRepository = new RaceRepository(_context);
+        _raceRepository = new RaceRepository(_context, NullLogger<RaceRepository>.Instance);
         _seasonRepository = new SeasonRepository(_context);
         _circuitRepository = new CircuitRepository(_context);
         _constructorRepository = new ConstructorRepository(_context);
-        _driverRepository = new DriverRepository(_context);
+        _driverRepository = new DriverRepository(_context, NullLogger<DriverRepository>.Instance);
     }
 
     public async Task DisposeAsync()

@@ -38,10 +38,29 @@ public class CircuitController : ControllerBase
     }
 
     [HttpGet("cached")]
-    public ActionResult<IEnumerable<Circuit>> GetCachedCircuits()
+    public async Task<ActionResult<IEnumerable<Circuit>>> GetCachedCircuits()
     {
-        _logger.LogInformation("GET /api/circuit/cached - Fetching cached circuits");
-        var circuits = _circuitService.GetCachedCircuits();
-        return Ok(circuits);
+        try
+        {
+            _logger.LogInformation("GET /api/circuit/cached - Fetching cached circuits");
+            var circuits = await _circuitService.GetCachedCircuitsAsync();
+            
+            if (!circuits.Any())
+            {
+                _logger.LogWarning("No cached circuits found. Database may be empty.");
+                return Ok(new { 
+                    message = "No cached circuits found. Try calling /api/circuit first to populate the cache.",
+                    circuits = circuits 
+                });
+            }
+            
+            _logger.LogInformation("Successfully retrieved {Count} cached circuits", circuits.Count());
+            return Ok(circuits);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching cached circuits");
+            throw;
+        }
     }
 }
