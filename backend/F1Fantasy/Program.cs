@@ -67,6 +67,23 @@ builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
+// Add CORS policy
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins(
+            "http://localhost:5173",  // Vite dev server
+            "http://localhost:3000",  // Alternative dev port
+            "https://f1fantasy.com",  // Production domain (add your actual domain)
+            "https://www.f1fantasy.com"
+        )
+        .AllowAnyMethod()
+        .AllowAnyHeader()
+        .AllowCredentials();
+    });
+});
+
 var app = builder.Build();
 
 // Add global exception handler middleware
@@ -84,6 +101,9 @@ if (app.Environment.IsDevelopment())
 
 // HTTPS redirection disabled - Render.com handles SSL/TLS at proxy level
 // app.UseHttpsRedirection();
+
+// Enable CORS - must be before UseAuthorization
+app.UseCors("AllowFrontend");
 
 app.UseAuthorization();
 
