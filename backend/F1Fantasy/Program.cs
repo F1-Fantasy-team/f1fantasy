@@ -96,20 +96,24 @@ if (string.IsNullOrEmpty(clerkSecretKey))
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        options.Authority = "https://clerk.com";
+        // Replace with YOUR actual Frontend API URL from Clerk Dashboard
+        var frontendApiUrl = "https://above-stag-28.clerk.accounts.dev";  // ← change this!
+
+        options.Authority = frontendApiUrl;                     // Enables discovery
+        options.MetadataAddress = $"{frontendApiUrl}/.well-known/openid-configuration"; // optional but good
+        options.RequireHttpsMetadata = true;                    // keep true in prod
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidateIssuer = true,
-            ValidateAudience = false, // Clerk doesn't use audience validation by default
+            ValidateIssuer = true,                              // will use discovered issuer
+            ValidateAudience = false,                           // Clerk doesn't require/validate aud by default
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = "https://clerk.com",
+            // Do NOT set ValidIssuer or ValidIssuers manually — let discovery handle it
             ClockSkew = TimeSpan.FromMinutes(5)
         };
-        
-        // Configure Clerk's JWKS endpoint for key validation
-        options.MetadataAddress = "https://clerk.com/.well-known/jwks.json";
-        
+
+        // Optional: log more details on failure
         options.Events = new JwtBearerEvents
         {
             OnAuthenticationFailed = context =>
@@ -121,7 +125,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             OnTokenValidated = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                var userId = context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var userId = context.Principal?.FindFirst("sub")?.Value; // Clerk uses "sub" for user ID
                 logger.LogInformation("Token validated successfully for user: {UserId}", userId);
                 return Task.CompletedTask;
             }
