@@ -2,12 +2,14 @@ using F1Fantasy.Models;
 using F1Fantasy.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace F1Fantasy.Controllers;
 
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
+[EnableRateLimiting("read")]
 public class DriverStandingController : ControllerBase
 {
     private readonly DriverStandingService _service;

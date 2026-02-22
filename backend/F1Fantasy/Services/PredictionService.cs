@@ -1,5 +1,6 @@
 using F1Fantasy.Models;
 using F1Fantasy.Repository;
+using F1Fantasy.Validation;
 
 namespace F1Fantasy.Services;
 
@@ -47,6 +48,16 @@ public class PredictionService
     {
         await ValidateGroupAndLockAsync(groupId, userId);
 
+        // Validate list size to prevent DoS attacks
+        ValidationExtensions.ValidateListSize(rankedConstructorIds, 
+            ValidationExtensions.MAX_CONSTRUCTOR_LIST_SIZE, "constructors");
+
+        // Validate ID format for each constructor
+        foreach (var id in rankedConstructorIds)
+        {
+            ValidationExtensions.ValidateId(id, "Constructor ID");
+        }
+
         // Validate: Must have all constructors, no duplicates
         var allConstructors = await _constructorRepository.GetAllAsync();
         var constructorIds = allConstructors.Select(c => c.ConstructorId).ToList();
@@ -86,6 +97,16 @@ public class PredictionService
         int groupId, string userId, List<string> rankedDriverIds)
     {
         await ValidateGroupAndLockAsync(groupId, userId);
+
+        // Validate list size to prevent DoS attacks
+        ValidationExtensions.ValidateListSize(rankedDriverIds, 
+            ValidationExtensions.MAX_DRIVER_LIST_SIZE, "drivers");
+
+        // Validate ID format for each driver
+        foreach (var id in rankedDriverIds)
+        {
+            ValidationExtensions.ValidateId(id, "Driver ID");
+        }
 
         // Validate: Must have all active drivers (20-22), no duplicates
         var allDrivers = await _driverRepository.GetAllAsync();

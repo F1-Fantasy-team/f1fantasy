@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using F1Fantasy.Models;
 using F1Fantasy.Services;
 
@@ -8,6 +9,7 @@ namespace F1Fantasy.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
+[EnableRateLimiting("read")]
 public class DriverController : ControllerBase
 {
     private readonly DriverService _driverService;
