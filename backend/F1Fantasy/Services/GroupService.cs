@@ -17,7 +17,6 @@ public class GroupService
     {
         // Validate inputs
         ValidationExtensions.ValidateGroupName(name);
-        ValidationExtensions.ValidateLockMode(lockMode);
 
         // Generate unique invite code
         var inviteCode = GenerateInviteCode();
