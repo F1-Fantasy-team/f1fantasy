@@ -1,5 +1,8 @@
+import { useEffect } from "react";
+import { useAuth } from "@clerk/clerk-react";
 import { ConfigProvider } from "antd";
 import { RecoilRoot } from "recoil";
+import { setAuthTokenGetter } from "./api/client";
 import Index from "./pages/Index.tsx";
 
 const f1Theme = {
@@ -13,13 +16,26 @@ const f1Theme = {
     },
 };
 
+/** Registers Clerk session token with the API client so requests send Authorization: Bearer <token>. */
+function ApiAuthSetup() {
+    const { getToken } = useAuth();
+    useEffect(() => {
+        setAuthTokenGetter(() => getToken());
+        return () => setAuthTokenGetter(null);
+    }, [getToken]);
+    return null;
+}
+
 function App() {
     return (
-        <ConfigProvider theme={f1Theme}>
-            <RecoilRoot>
-                <Index />
-            </RecoilRoot>
-        </ConfigProvider>
+        <>
+            <ApiAuthSetup />
+            <ConfigProvider theme={f1Theme}>
+                <RecoilRoot>
+                    <Index />
+                </RecoilRoot>
+            </ConfigProvider>
+        </>
     );
 }
 export default App;
