@@ -39,7 +39,7 @@ export function TwoDriverPicker({ value, onSave, labels = ["Driver 1", "Driver 2
             onChange={setDriverId1}
             options={driverOptions}
             className={selectClass}
-            popupClassName={dropdownClass}
+            classNames={{ popup: { root: dropdownClass } }}
             allowClear
             showSearch
             filterOption={(input, option) =>
@@ -59,7 +59,7 @@ export function TwoDriverPicker({ value, onSave, labels = ["Driver 1", "Driver 2
               disabled: opt.value === driverId1,
             }))}
             className={selectClass}
-            popupClassName={dropdownClass}
+            classNames={{ popup: { root: dropdownClass } }}
             allowClear
             showSearch
             filterOption={(input, option) =>

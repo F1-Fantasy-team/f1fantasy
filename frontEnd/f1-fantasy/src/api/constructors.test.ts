@@ -1,10 +1,16 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   mapConstructorApiToConstructor,
-  getMockConstructors,
   fetchConstructorsFromApi,
 } from "./constructors";
+import { getApiBaseUrl, apiGet } from "./client";
+import { getCurrentSeason } from "../constants/season";
 import type { ConstructorApi } from "./types";
+
+vi.mock("./client", () => ({
+  getApiBaseUrl: vi.fn(),
+  apiGet: vi.fn(),
+}));
 
 describe("mapConstructorApiToConstructor", () => {
   it("maps API constructor to app Constructor with lowercase id", () => {
@@ -21,37 +27,46 @@ describe("mapConstructorApiToConstructor", () => {
   });
 });
 
-describe("getMockConstructors", () => {
-  it("returns an array (empty when no mock data in repo)", () => {
-    const constructors = getMockConstructors();
-    expect(Array.isArray(constructors)).toBe(true);
-  });
-
-  it("returns constructors with id and name when present", () => {
-    const constructors = getMockConstructors();
-    constructors.forEach((c) => {
-      expect(c).toHaveProperty("id");
-      expect(c).toHaveProperty("name");
-      expect(typeof c.id).toBe("string");
-      expect(typeof c.name).toBe("string");
-    });
-  });
-});
-
 describe("fetchConstructorsFromApi", () => {
-  it("returns Promise that resolves to Constructor[] or null", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-    } as Response);
+  beforeEach(() => {
+    vi.mocked(getApiBaseUrl).mockReturnValue("https://api.example.com");
+    vi.mocked(apiGet).mockReset();
+  });
+
+  it("returns null when getApiBaseUrl is not set", async () => {
+    vi.mocked(getApiBaseUrl).mockReturnValue(undefined);
     const result = await fetchConstructorsFromApi();
-    fetchSpy.mockRestore();
-    expect(result === null || Array.isArray(result)).toBe(true);
-    if (result !== null) {
-      result.forEach((c) => {
-        expect(c).toHaveProperty("id");
-        expect(c).toHaveProperty("name");
-      });
-    }
+    expect(result).toBeNull();
+  });
+
+  it("returns constructors when API returns non-empty array", async () => {
+    const apiConstructors: ConstructorApi[] = [
+      {
+        constructorId: "RED_BULL_RACING",
+        url: "",
+        name: "Red Bull Racing",
+        nationality: "Austrian",
+      },
+    ];
+    vi.mocked(apiGet).mockResolvedValue(apiConstructors);
+    const result = await fetchConstructorsFromApi();
+    expect(result).toEqual([
+      { id: "red_bull_racing", name: "Red Bull Racing" },
+    ]);
+    expect(apiGet).toHaveBeenCalledWith(
+      `/api/constructor/season/${getCurrentSeason()}`
+    );
+  });
+
+  it("returns null when API throws", async () => {
+    vi.mocked(apiGet).mockRejectedValue(new Error("API 500"));
+    const result = await fetchConstructorsFromApi();
+    expect(result).toBeNull();
+  });
+
+  it("returns null when API returns empty array", async () => {
+    vi.mocked(apiGet).mockResolvedValue([]);
+    const result = await fetchConstructorsFromApi();
+    expect(result).toBeNull();
   });
 });

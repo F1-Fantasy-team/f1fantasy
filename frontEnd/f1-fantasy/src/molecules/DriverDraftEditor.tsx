@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { Select } from "antd";
 import { F1Button } from "../atoms";
-import { MOCK_DRIVERS } from "../data/mockDrivers";
+import { useDrivers } from "../state/useDriversAndConstructors";
 import type { DriverDraftPrediction } from "../types/predictions";
-
-const DRIVER_OPTIONS = MOCK_DRIVERS.map((d) => ({ value: d.id, label: d.name }));
 
 type DriverDraftEditorProps = {
   value: DriverDraftPrediction | undefined;
@@ -12,6 +10,8 @@ type DriverDraftEditorProps = {
 };
 
 export function DriverDraftEditor({ value, onSave }: DriverDraftEditorProps) {
+  const drivers = useDrivers();
+  const driverOptions = drivers.map((d) => ({ value: d.id, label: d.name }));
   const [driverId1, setDriverId1] = useState(value?.driverId1 ?? "");
   const [driverId2, setDriverId2] = useState(value?.driverId2 ?? "");
 
@@ -30,8 +30,9 @@ export function DriverDraftEditor({ value, onSave }: DriverDraftEditorProps) {
             placeholder="Select driver"
             value={driverId1 || undefined}
             onChange={setDriverId1}
-            options={DRIVER_OPTIONS}
+            options={driverOptions}
             className="w-full [&_.ant-select-selector]:bg-f1-gray [&_.ant-select-selector]:border-f1-gray [&_.ant-select-selection-item]:text-f1-silver"
+            classNames={{ popup: { root: "f1-driver-select-dropdown" } }}
             allowClear
           />
         </div>
@@ -41,11 +42,12 @@ export function DriverDraftEditor({ value, onSave }: DriverDraftEditorProps) {
             placeholder="Select driver"
             value={driverId2 || undefined}
             onChange={setDriverId2}
-            options={DRIVER_OPTIONS.map((opt) => ({
+            options={driverOptions.map((opt) => ({
               ...opt,
               disabled: opt.value === driverId1,
             }))}
             className="w-full [&_.ant-select-selector]:bg-f1-gray [&_.ant-select-selector]:border-f1-gray [&_.ant-select-selection-item]:text-f1-silver"
+            classNames={{ popup: { root: "f1-driver-select-dropdown" } }}
             allowClear
           />
         </div>

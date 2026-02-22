@@ -1,9 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import {
-  mapDriverApiToDriver,
-  getMockDrivers,
-  fetchDriversFromApi,
-} from "./drivers";
+import { mapDriverApiToDriver, fetchDriversFromApi } from "./drivers";
+import { getCurrentSeason } from "../constants/season";
 import type { DriverApi } from "./types";
 
 vi.mock("./client", () => ({
@@ -60,23 +57,6 @@ describe("mapDriverApiToDriver", () => {
   });
 });
 
-describe("getMockDrivers", () => {
-  it("returns an array (empty when no mock data in repo)", () => {
-    const drivers = getMockDrivers();
-    expect(Array.isArray(drivers)).toBe(true);
-  });
-
-  it("returns drivers with id and name when present", () => {
-    const drivers = getMockDrivers();
-    drivers.forEach((d) => {
-      expect(d).toHaveProperty("id");
-      expect(d).toHaveProperty("name");
-      expect(typeof d.id).toBe("string");
-      expect(typeof d.name).toBe("string");
-    });
-  });
-});
-
 describe("fetchDriversFromApi", () => {
   it("returns Promise that resolves to Driver[] or null", async () => {
     const { apiGet } = await import("./client");
@@ -91,7 +71,7 @@ describe("fetchDriversFromApi", () => {
     }
   });
 
-  it("returns all drivers from season API (no permanentNumber filter)", async () => {
+  it("returns all drivers from season API and calls API with current season", async () => {
     const { apiGet } = await import("./client");
     const apiDrivers: DriverApi[] = [
       {
@@ -121,5 +101,6 @@ describe("fetchDriversFromApi", () => {
     expect(result!.length).toBe(2);
     expect(result![0].id).toBe("ver");
     expect(result![1].id).toBe("reserve_1");
+    expect(apiGet).toHaveBeenCalledWith(`/api/driver/season/${getCurrentSeason()}`);
   });
 });

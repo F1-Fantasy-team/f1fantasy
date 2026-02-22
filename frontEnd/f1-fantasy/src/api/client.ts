@@ -25,12 +25,57 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
-export async function apiGet<T>(path: string): Promise<T> {
+const baseUrl = (path: string) => {
   const base = getApiBaseUrl();
   if (!base) throw new Error("VITE_API_BASE_URL is not set");
-  const url = path.startsWith("http") ? path : `${base}${path.startsWith("/") ? path : `/${path}`}`;
+  return path.startsWith("http") ? path : `${base}${path.startsWith("/") ? path : `/${path}`}`;
+};
+
+export async function apiGet<T>(path: string): Promise<T> {
+  const url = baseUrl(path);
   const headers = await getAuthHeaders();
   const res = await fetch(url, { method: "GET", headers });
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
   return res.json() as Promise<T>;
+}
+
+/** GET that returns null on 404 (e.g. no prediction yet). Use for optional resources. */
+export async function apiGetOptional<T>(path: string): Promise<T | null> {
+  const url = baseUrl(path);
+  const headers = await getAuthHeaders();
+  const res = await fetch(url, { method: "GET", headers });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
+  return res.json() as Promise<T>;
+}
+
+export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
+  const url = baseUrl(path);
+  const headers = await getAuthHeaders();
+  headers["Content-Type"] = "application/json";
+  const res = await fetch(url, {
+    method: "POST",
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
+
+export async function apiPut<T>(path: string, body: unknown): Promise<T> {
+  const url = baseUrl(path);
+  const headers = await getAuthHeaders();
+  headers["Content-Type"] = "application/json";
+  const res = await fetch(url, { method: "PUT", headers, body: JSON.stringify(body) });
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
+
+export async function apiDelete(path: string): Promise<void> {
+  const url = baseUrl(path);
+  const headers = await getAuthHeaders();
+  const res = await fetch(url, { method: "DELETE", headers });
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
 }

@@ -3,8 +3,6 @@ import type { Group } from "../types/group";
 import type { GroupPredictionsData } from "../types/predictions";
 import type { Driver } from "../types/driver";
 import type { Constructor } from "../types/constructor";
-import { MOCK_DRIVERS } from "../data/mockDrivers";
-import { MOCK_CONSTRUCTORS } from "../data/mockConstructors";
 
 export const selectedGroupIdState = atom<string | null>({
   key: "selectedGroupId",
@@ -28,32 +26,44 @@ export const selectedCategoryIdState = atom<string | null>({
   default: null,
 });
 
-/** Per-group predictions data (including lock state). Initialized from mock when group is first opened. */
+/** Per-group predictions data (including lock state). Filled from API when group is opened. */
 export const groupPredictionsState = atomFamily<GroupPredictionsData | null, string>({
   key: "groupPredictions",
   default: null,
 });
 
-/** Drivers list. Fetched from API when VITE_API_BASE_URL is set; otherwise mock. */
+/** Drivers list. Fetched from API when a group is selected. */
 export const driversState = atom<Driver[]>({
   key: "drivers",
-  default: MOCK_DRIVERS,
+  default: [],
 });
 
-/** Constructors list. Fetched from API when VITE_API_BASE_URL is set; otherwise mock. */
+/** Constructors list. Fetched from API when a group is selected. */
 export const constructorsState = atom<Constructor[]>({
   key: "constructors",
-  default: MOCK_CONSTRUCTORS,
+  default: [],
 });
 
-/** True when drivers were loaded from the API (false = using offline mock list). */
+/** True when drivers were loaded from the API. */
 export const driversFromApiState = atom<boolean>({
   key: "driversFromApi",
   default: false,
 });
 
-/** True when constructors were loaded from the API (false = using offline mock list). */
+/** True when constructors were loaded from the API. */
 export const constructorsFromApiState = atom<boolean>({
   key: "constructorsFromApi",
+  default: false,
+});
+
+/** First race date (ISO) for current season from GET /api/race/{season}. Used for system prediction lock. */
+export const firstRaceDateState = atom<string | null>({
+  key: "firstRaceDate",
+  default: null,
+});
+
+/** True while drivers/constructors/races (or other app data) are being loaded on demand. Show global loading UI when true. */
+export const appDataLoadingState = atom<boolean>({
+  key: "appDataLoading",
   default: false,
 });

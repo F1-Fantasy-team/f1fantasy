@@ -69,6 +69,13 @@ body > div[class*="cl-"] a:hover {
   color: #e10600 !important;
 }
 
+/* Navbar brand: keep white so antd App link styles (blue) don't override */
+.navbar-brand,
+.navbar-brand:hover,
+.navbar-brand:focus {
+  color: var(--color-f1-white) !important;
+}
+
 /* Driver select dropdown: highlight must contrast with text (dark bg, light text) so option is readable */
 .f1-driver-select-dropdown.ant-select-dropdown .ant-select-item-option {
   color: #e5e5e5;
@@ -80,4 +87,10 @@ body > div[class*="cl-"] a:hover {
 }
 .f1-driver-select-dropdown.ant-select-dropdown .ant-select-item-option-selected .ant-select-item-option-state {
   color: #e10600;
+}
+
+/* Global loading bar (indeterminate) */
+@keyframes loading-bar {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
 }

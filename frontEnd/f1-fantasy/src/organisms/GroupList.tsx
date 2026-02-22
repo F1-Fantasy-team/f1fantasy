@@ -1,4 +1,3 @@
-import { List } from "antd";
 import { GroupCard } from "../molecules";
 import type { Group } from "../types/group";
 
@@ -8,15 +7,10 @@ type GroupListProps = {
 
 export function GroupList({ groups }: GroupListProps) {
   return (
-    <List
-      grid={{ gutter: 12, xs: 1, sm: 1, md: 2 }}
-      className="min-w-0"
-      dataSource={groups}
-      renderItem={(group) => (
-        <List.Item>
-          <GroupCard group={group} />
-        </List.Item>
-      )}
-    />
+    <div className="min-w-0 grid grid-cols-1 gap-3 md:grid-cols-2">
+      {groups.map((group) => (
+        <GroupCard key={group.id} group={group} />
+      ))}
+    </div>
   );
 }

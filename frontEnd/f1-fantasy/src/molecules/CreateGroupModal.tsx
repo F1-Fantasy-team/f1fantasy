@@ -1,4 +1,5 @@
-import { Modal, Form, Input } from "antd";
+import { useState } from "react";
+import { App, Modal, Form, Input } from "antd";
 import { F1Button, F1Title } from "../atoms";
 import type { Group } from "../types/group";
 import type { PredictionLockMode } from "../types/group";
@@ -7,6 +8,8 @@ type CreateGroupModalProps = {
   open: boolean;
   onClose: () => void;
   onCreated: (group: Group) => void;
+  /** Create group via API. Returns the created group. */
+  createGroup: (payload: { name: string; predictionLockMode: PredictionLockMode }) => Promise<Group>;
   /** Current user ID; set as group admin. */
   currentUserId: string;
 };
@@ -70,23 +73,27 @@ function LockModeCards({
   );
 }
 
-export function CreateGroupModal({ open, onClose, onCreated, currentUserId }: CreateGroupModalProps) {
+export function CreateGroupModal({ open, onClose, onCreated, createGroup, currentUserId }: CreateGroupModalProps) {
+  const { message } = App.useApp();
   const [form] = Form.useForm<{ name: string; predictionLockMode: PredictionLockMode }>();
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = () => {
-    form.validateFields().then((values) => {
-      const newGroup: Group = {
-        id: `grp-${Date.now()}`,
-        name: values.name.trim(),
-        memberCount: 1,
-        createdAt: new Date().toISOString(),
-        inviteCode: `F1-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
-        adminUserId: currentUserId,
-        predictionLockMode: values.predictionLockMode ?? "hybrid",
-      };
-      onCreated(newGroup);
-      form.resetFields();
-      onClose();
+    form.validateFields().then(async (values) => {
+      setSubmitting(true);
+      try {
+        const group = await createGroup({
+          name: values.name.trim(),
+          predictionLockMode: values.predictionLockMode ?? "hybrid",
+        });
+        onCreated(group);
+        form.resetFields();
+        onClose();
+      } catch (err) {
+        message.error(err instanceof Error ? err.message : "Failed to create group");
+      } finally {
+        setSubmitting(false);
+      }
     });
   };
 
@@ -155,7 +162,7 @@ export function CreateGroupModal({ open, onClose, onCreated, currentUserId }: Cr
           <F1Button onClick={handleCancel} className="min-w-[100px]">
             Cancel
           </F1Button>
-          <F1Button type="primary" htmlType="submit" className="min-w-[120px]">
+          <F1Button type="primary" htmlType="submit" className="min-w-[120px]" disabled={submitting}>
             Create group
           </F1Button>
         </div>

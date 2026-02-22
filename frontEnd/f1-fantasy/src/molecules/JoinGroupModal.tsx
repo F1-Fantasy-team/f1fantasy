@@ -8,8 +8,8 @@ type JoinGroupModalProps = {
   onClose: () => void;
   onJoined: (group: Group) => void;
   onError: (message: string) => void;
-  /** Look up a group by invite code (mock: search allGroups). */
-  findGroupByCode: (code: string) => Group | undefined;
+  /** Look up a group by invite code via API. Can be async. */
+  findGroupByCode: (code: string) => Group | undefined | Promise<Group | undefined>;
   /** Check if user is already in this group. */
   isAlreadyMember: (group: Group) => boolean;
   /** Pre-fill code (e.g. from ?join= in URL). */
@@ -34,9 +34,9 @@ export function JoinGroupModal({
   }, [open, initialCode, form]);
 
   const handleSubmit = () => {
-    form.validateFields().then((values) => {
-      const code = values.code.trim().toUpperCase();
-      const group = findGroupByCode(code);
+    form.validateFields().then(async (values) => {
+      const code = values.code.trim();
+      const group = await Promise.resolve(findGroupByCode(code));
       if (!group) {
         onError("Invalid or expired invite code.");
         return;

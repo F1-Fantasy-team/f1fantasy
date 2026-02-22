@@ -1,13 +1,10 @@
 import type { GroupPredictionsData } from "../types/predictions";
 
-/** Group predictions: empty by default. Add data locally for dev. Do not commit real mock data. */
-export const MOCK_GROUP_PREDICTIONS: Record<string, GroupPredictionsData> = {};
-
-export function getGroupPredictionsData(_groupId: string): GroupPredictionsData | undefined {
-  return undefined;
-}
-
-export function getOrCreateGroupPredictionsData(
+/**
+ * Create initial group predictions data (current user only, zero scores).
+ * Used as the default shape before API data is loaded.
+ */
+export function createInitialGroupPredictionsData(
   groupId: string,
   currentUserId: string,
   currentUserDisplayName: string
