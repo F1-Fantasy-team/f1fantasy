@@ -66,7 +66,9 @@ public class CacheHeaderMiddleware
     /// </summary>
     private bool ShouldCacheModerately(string path)
     {
-        return path.Contains("/groups") && !path.Contains("/standings");
+        // Disabled caching for /groups due to delete/update issues
+        // Users were seeing deleted groups due to 5-minute cache
+        return false; // path.Contains("/groups") && !path.Contains("/standings");
     }
 
     /// <summary>
