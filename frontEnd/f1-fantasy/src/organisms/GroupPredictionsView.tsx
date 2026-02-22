@@ -9,7 +9,6 @@ import {
   isUserLocked,
   canUserUnlockSelf,
   getEffectiveGroupLocked,
-  getSystemPredictionsLocked,
   isGroupAdmin,
 } from "../utils/predictionLock";
 import type { Group } from "../types/group";
@@ -62,23 +61,14 @@ export function GroupPredictionsView({
     setData((prev) => ({ ...prev, adminSetPredictionsLocked: false }));
   };
 
-  const handleAdminOverrideLock = () => {
-    setData((prev) => ({ ...prev, adminLockOverride: true }));
-  };
-
-  const handleAdminOverrideUnlock = () => {
-    setData((prev) => ({ ...prev, adminLockOverride: false }));
-  };
-
-  const handleAdminClearOverride = () => {
-    setData((prev) => ({ ...prev, adminLockOverride: undefined }));
+  const handleAdminOverrideToggle = () => {
+    setData((prev) => ({ ...prev, adminLockOverride: !groupLocked }));
   };
 
   const handleCategoryClick = (categoryId: PredictionCategoryId) => {
     setSelectedCategoryId(categoryId);
   };
 
-  const systemLocked = getSystemPredictionsLocked(data);
   const showAdminGroupToggle = isAdmin && mode === "admin";
   const showAdminOverride = isAdmin && mode === "hybrid";
 
@@ -104,27 +94,10 @@ export function GroupPredictionsView({
               )}
             </>
           )}
-          {showAdminOverride && (
-            <>
-              <F1Text muted className="text-sm">
-                System: {systemLocked ? "locked" : "unlocked"}
-                {data.adminLockOverride !== undefined && ` · Override: ${data.adminLockOverride ? "locked" : "unlocked"}`}
-              </F1Text>
-              {data.adminLockOverride === undefined ? (
-                <>
-                  <F1Button type="default" size="small" icon={<LockOutlined />} onClick={handleAdminOverrideLock}>
-                    Override: lock
-                  </F1Button>
-                  <F1Button type="default" size="small" icon={<UnlockOutlined />} onClick={handleAdminOverrideUnlock}>
-                    Override: unlock
-                  </F1Button>
-                </>
-              ) : (
-                <F1Button type="default" size="small" onClick={handleAdminClearOverride}>
-                  Use system default
-                </F1Button>
-              )}
-            </>
+          {showAdminOverride && groupLocked && (
+            <F1Button type="default" size="small" icon={<UnlockOutlined />} onClick={handleAdminOverrideToggle}>
+              Unlock predictions
+            </F1Button>
           )}
           {!groupLocked && (
             <>
