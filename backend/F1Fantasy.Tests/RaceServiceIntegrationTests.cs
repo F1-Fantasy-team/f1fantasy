@@ -43,7 +43,8 @@ public class RaceServiceIntegrationTests : IDisposable
             .Options;
         var context = new F1FantasyDbContext(options);
         _raceRepository = new RaceRepository(context, NullLogger<RaceRepository>.Instance);
-        _raceService = new RaceService(_httpClient, _raceRepository, NullLogger<RaceService>.Instance);
+        var metadataRepository = new DataFetchMetadataRepository(context, NullLogger<DataFetchMetadataRepository>.Instance);
+        _raceService = new RaceService(_httpClient, _raceRepository, metadataRepository, NullLogger<RaceService>.Instance);
     }
 
     [Fact]

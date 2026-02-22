@@ -430,8 +430,9 @@ public class F1FantasyDbContext : DbContext
         {
             entity.HasKey(p => p.Id);
             entity.Property(p => p.UserId).HasMaxLength(100).IsRequired();
-            entity.Property(p => p.Driver1Id).HasMaxLength(100);
-            entity.Property(p => p.Driver2Id).HasMaxLength(100);
+            entity.Property(p => p.DriverIds)
+                .HasColumnType("jsonb")
+                .IsRequired();
             
             entity.HasIndex(p => new { p.GroupId, p.UserId }).IsUnique();
             entity.HasIndex(p => p.UserId);
