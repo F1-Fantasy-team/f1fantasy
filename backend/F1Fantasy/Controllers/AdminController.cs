@@ -1,4 +1,5 @@
 using F1Fantasy.Repository;
+using F1Fantasy.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -14,11 +15,19 @@ public class AdminController : ControllerBase
 {
     private readonly PredictionRepository _predictionRepository;
     private readonly GroupRepository _groupRepository;
+    private readonly DriverService _driverService;
+    private readonly ConstructorService _constructorService;
 
-    public AdminController(PredictionRepository predictionRepository, GroupRepository groupRepository)
+    public AdminController(
+        PredictionRepository predictionRepository, 
+        GroupRepository groupRepository,
+        DriverService driverService,
+        ConstructorService constructorService)
     {
         _predictionRepository = predictionRepository;
         _groupRepository = groupRepository;
+        _driverService = driverService;
+        _constructorService = constructorService;
     }
 
     private string GetUserId()
@@ -106,6 +115,29 @@ public class AdminController : ControllerBase
 
             var wildcards = await _predictionRepository.GetAllWildcardsAsync(groupId);
             return Ok(wildcards);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpPost("populate-season/{season}")]
+    public async Task<IActionResult> PopulateSeason(string season)
+    {
+        try
+        {
+            // Fetch drivers and constructors for the specified season
+            // This will automatically add the season to their ActiveSeasons list
+            var drivers = await _driverService.GetDriversBySeasonAsync(season);
+            var constructors = await _constructorService.GetConstructorsBySeasonAsync(season);
+
+            return Ok(new 
+            { 
+                message = $"Successfully populated season {season}",
+                driversCount = drivers.Count(),
+                constructorsCount = constructors.Count()
+            });
         }
         catch (Exception ex)
         {
