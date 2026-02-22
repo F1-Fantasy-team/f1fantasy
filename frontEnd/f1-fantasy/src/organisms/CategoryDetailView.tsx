@@ -3,6 +3,7 @@ import { ArrowLeftOutlined } from "@ant-design/icons";
 import { F1Button, F1Title, F1Text, F1Card } from "../atoms";
 import { PredictionContent, getDriverName, getConstructorName } from "../molecules/YourPredictionContent";
 import { DriversChampionshipEditor } from "../molecules/DriversChampionshipEditor";
+import { ConstructorsChampionshipEditor } from "../molecules/ConstructorsChampionshipEditor";
 import { TwoDriverPicker } from "../molecules/TwoDriverPicker";
 import { ZeroPointersEditor } from "../molecules/ZeroPointersEditor";
 import { CATEGORY_LABELS, CATEGORY_DESCRIPTIONS } from "../constants/predictionCategories";
@@ -166,6 +167,15 @@ export function CategoryDetailView({ group, categoryId, data, setData, currentUs
     }));
   };
 
+  const handleSaveConstructorsChampionship = (constructorsChampionship: { position: number; constructorId: string }[]) => {
+    setData((prev) => ({
+      ...prev,
+      predictions: prev.predictions.map((p) =>
+        p.userId === currentUserId ? { ...p, constructorsChampionship } : p
+      ),
+    }));
+  };
+
   const handleSaveDriverDraft = (driverDraft: { driverId1: string; driverId2: string }) => {
     setData((prev) => ({
       ...prev,
@@ -247,6 +257,11 @@ export function CategoryDetailView({ group, categoryId, data, setData, currentUs
                 <DriversChampionshipEditor
                   value={myPredictions?.driversChampionship}
                   onSave={handleSaveDriversChampionship}
+                />
+              ) : categoryId === "constructorsChampionship" ? (
+                <ConstructorsChampionshipEditor
+                  value={myPredictions?.constructorsChampionship}
+                  onSave={handleSaveConstructorsChampionship}
                 />
               ) : categoryId === "driverDraft" ? (
                 <TwoDriverPicker
