@@ -10,6 +10,7 @@ public class F1FantasyDbContext : DbContext
     {
     }
 
+    // F1 Data DbSets
     public DbSet<Race> Races { get; set; }
     public DbSet<Season> Seasons { get; set; }
     public DbSet<Circuit> Circuits { get; set; }
@@ -22,6 +23,18 @@ public class F1FantasyDbContext : DbContext
     public DbSet<DriverStanding> DriverStandings { get; set; }
     public DbSet<ConstructorStanding> ConstructorStandings { get; set; }
     public DbSet<Status> Statuses { get; set; }
+
+    // Fantasy League DbSets
+    public DbSet<Group> Groups { get; set; }
+    public DbSet<GroupMember> GroupMembers { get; set; }
+    public DbSet<ConstructorChampionshipPrediction> ConstructorChampionshipPredictions { get; set; }
+    public DbSet<DriverChampionshipPrediction> DriverChampionshipPredictions { get; set; }
+    public DbSet<DriverDraftPrediction> DriverDraftPredictions { get; set; }
+    public DbSet<DestructorPrediction> DestructorPredictions { get; set; }
+    public DbSet<MrSaturdayPrediction> MrSaturdayPredictions { get; set; }
+    public DbSet<ZeroPointerPrediction> ZeroPointerPredictions { get; set; }
+    public DbSet<WildcardPrediction> WildcardPredictions { get; set; }
+    public DbSet<Standing> Standings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -288,6 +301,174 @@ public class F1FantasyDbContext : DbContext
             
             // Index for text lookups
             entity.HasIndex(s => s.StatusText);
+        });
+
+        // Group configuration
+        modelBuilder.Entity<Group>(entity =>
+        {
+            entity.HasKey(g => g.Id);
+            entity.Property(g => g.Name).HasMaxLength(200).IsRequired();
+            entity.Property(g => g.InviteCode).HasMaxLength(50).IsRequired();
+            entity.Property(g => g.LockMode).HasMaxLength(20).IsRequired();
+            entity.Property(g => g.AdminUserId).HasMaxLength(100).IsRequired();
+            
+            entity.HasIndex(g => g.InviteCode).IsUnique();
+            entity.HasIndex(g => g.AdminUserId);
+        });
+
+        // GroupMember configuration
+        modelBuilder.Entity<GroupMember>(entity =>
+        {
+            entity.HasKey(gm => gm.Id);
+            entity.Property(gm => gm.UserId).HasMaxLength(100).IsRequired();
+            
+            entity.HasIndex(gm => new { gm.GroupId, gm.UserId }).IsUnique();
+            entity.HasIndex(gm => gm.UserId);
+            
+            entity.HasOne(gm => gm.Group)
+                .WithMany(g => g.Members)
+                .HasForeignKey(gm => gm.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ConstructorChampionshipPrediction configuration
+        modelBuilder.Entity<ConstructorChampionshipPrediction>(entity =>
+        {
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.UserId).HasMaxLength(100).IsRequired();
+            
+            // Store ranked constructor IDs as JSON column
+            entity.Property(p => p.RankedConstructorIds)
+                .HasColumnType("jsonb")
+                .IsRequired();
+            
+            entity.HasIndex(p => new { p.GroupId, p.UserId }).IsUnique();
+            entity.HasIndex(p => p.UserId);
+            
+            entity.HasOne(p => p.Group)
+                .WithMany()
+                .HasForeignKey(p => p.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // DriverChampionshipPrediction configuration
+        modelBuilder.Entity<DriverChampionshipPrediction>(entity =>
+        {
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.UserId).HasMaxLength(100).IsRequired();
+            
+            // Store ranked driver IDs as JSON column
+            entity.Property(p => p.RankedDriverIds)
+                .HasColumnType("jsonb")
+                .IsRequired();
+            
+            entity.HasIndex(p => new { p.GroupId, p.UserId }).IsUnique();
+            entity.HasIndex(p => p.UserId);
+            
+            entity.HasOne(p => p.Group)
+                .WithMany()
+                .HasForeignKey(p => p.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // DriverDraftPrediction configuration
+        modelBuilder.Entity<DriverDraftPrediction>(entity =>
+        {
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.UserId).HasMaxLength(100).IsRequired();
+            entity.Property(p => p.Driver1Id).HasMaxLength(100);
+            entity.Property(p => p.Driver2Id).HasMaxLength(100);
+            
+            entity.HasIndex(p => new { p.GroupId, p.UserId }).IsUnique();
+            entity.HasIndex(p => p.UserId);
+            
+            entity.HasOne(p => p.Group)
+                .WithMany()
+                .HasForeignKey(p => p.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // DestructorPrediction configuration
+        modelBuilder.Entity<DestructorPrediction>(entity =>
+        {
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.UserId).HasMaxLength(100).IsRequired();
+            entity.Property(p => p.Driver1Id).HasMaxLength(100);
+            entity.Property(p => p.Driver2Id).HasMaxLength(100);
+            
+            entity.HasIndex(p => new { p.GroupId, p.UserId }).IsUnique();
+            entity.HasIndex(p => p.UserId);
+            
+            entity.HasOne(p => p.Group)
+                .WithMany()
+                .HasForeignKey(p => p.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // MrSaturdayPrediction configuration
+        modelBuilder.Entity<MrSaturdayPrediction>(entity =>
+        {
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.UserId).HasMaxLength(100).IsRequired();
+            entity.Property(p => p.Driver1Id).HasMaxLength(100);
+            entity.Property(p => p.Driver2Id).HasMaxLength(100);
+            
+            entity.HasIndex(p => new { p.GroupId, p.UserId }).IsUnique();
+            entity.HasIndex(p => p.UserId);
+            
+            entity.HasOne(p => p.Group)
+                .WithMany()
+                .HasForeignKey(p => p.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ZeroPointerPrediction configuration
+        modelBuilder.Entity<ZeroPointerPrediction>(entity =>
+        {
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.UserId).HasMaxLength(100).IsRequired();
+            entity.Property(p => p.Driver1Id).HasMaxLength(100);
+            entity.Property(p => p.Driver2Id).HasMaxLength(100);
+            
+            entity.HasIndex(p => new { p.GroupId, p.UserId }).IsUnique();
+            entity.HasIndex(p => p.UserId);
+            
+            entity.HasOne(p => p.Group)
+                .WithMany()
+                .HasForeignKey(p => p.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // WildcardPrediction configuration
+        modelBuilder.Entity<WildcardPrediction>(entity =>
+        {
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.UserId).HasMaxLength(100).IsRequired();
+            entity.Property(p => p.Statement).HasMaxLength(500);
+            
+            entity.HasIndex(p => new { p.GroupId, p.UserId }).IsUnique();
+            entity.HasIndex(p => p.UserId);
+            
+            entity.HasOne(p => p.Group)
+                .WithMany()
+                .HasForeignKey(p => p.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Standing configuration
+        modelBuilder.Entity<Standing>(entity =>
+        {
+            entity.HasKey(s => s.Id);
+            entity.Property(s => s.UserId).HasMaxLength(100).IsRequired();
+            
+            entity.HasIndex(s => new { s.GroupId, s.UserId }).IsUnique();
+            entity.HasIndex(s => new { s.GroupId, s.Rank });
+            entity.HasIndex(s => s.UserId);
+            
+            entity.HasOne(s => s.Group)
+                .WithMany()
+                .HasForeignKey(s => s.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

@@ -18,6 +18,25 @@ public class ConstructorStandingService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Cache-first: Returns cached constructor standings if available, otherwise fetches from API
+    /// </summary>
+    public async Task<ConstructorStandingsList?> GetConstructorStandingsBySeasonCachedAsync(string season)
+    {
+        _logger.LogInformation("Checking cache for constructor standings for season {Season}", season);
+        
+        var cachedStandings = await GetCachedStandingsBySeasonAsync(season);
+        if (cachedStandings != null && cachedStandings.ConstructorStandings.Any())
+        {
+            _logger.LogInformation("Returning cached constructor standings for season {Season} ({Count} constructors)", 
+                season, cachedStandings.ConstructorStandings.Count);
+            return cachedStandings;
+        }
+
+        _logger.LogInformation("No cached constructor standings found for season {Season}, fetching from API", season);
+        return await GetConstructorStandingsBySeasonAsync(season);
+    }
+
     public async Task<ConstructorStandingsList?> GetConstructorStandingsBySeasonAsync(string season)
     {
         try

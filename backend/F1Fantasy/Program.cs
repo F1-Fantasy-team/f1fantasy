@@ -86,6 +86,18 @@ builder.Services.AddScoped<F1Fantasy.Services.ConstructorStandingService>();
 builder.Services.AddScoped<F1Fantasy.Repository.StatusRepository>();
 builder.Services.AddScoped<F1Fantasy.Services.StatusService>();
 
+// Fantasy League Services
+builder.Services.AddScoped<F1Fantasy.Repository.GroupRepository>();
+builder.Services.AddScoped<F1Fantasy.Repository.PredictionRepository>();
+builder.Services.AddScoped<F1Fantasy.Repository.StandingRepository>();
+builder.Services.AddScoped<F1Fantasy.Services.GroupService>();
+builder.Services.AddScoped<F1Fantasy.Services.PredictionService>();
+builder.Services.AddScoped<F1Fantasy.Services.ScoringService>();
+builder.Services.AddScoped<F1Fantasy.Services.StandingsService>();
+
+// Auto-lock background service
+builder.Services.AddHostedService<F1Fantasy.Services.AutoLockService>();
+
 // Configure Clerk JWT Authentication
 var clerkSecretKey = Environment.GetEnvironmentVariable("CLERK_SECRET_KEY");
 if (string.IsNullOrEmpty(clerkSecretKey))
