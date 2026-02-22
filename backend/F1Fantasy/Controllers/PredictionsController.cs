@@ -1,6 +1,7 @@
 using F1Fantasy.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 
 namespace F1Fantasy.Controllers;
@@ -8,6 +9,7 @@ namespace F1Fantasy.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
+[EnableRateLimiting("read")] // Default for GET operations
 public class PredictionsController : ControllerBase
 {
     private readonly PredictionService _predictionService;
@@ -25,6 +27,7 @@ public class PredictionsController : ControllerBase
 
     // Constructor Championship
     [HttpPost("groups/{groupId}/constructor-championship")]
+    [EnableRateLimiting("write")]
     public async Task<IActionResult> SaveConstructorChampionship(int groupId, [FromBody] List<string> rankedConstructorIds)
     {
         try
@@ -61,6 +64,7 @@ public class PredictionsController : ControllerBase
 
     // Driver Championship
     [HttpPost("groups/{groupId}/driver-championship")]
+    [EnableRateLimiting("write")]
     public async Task<IActionResult> SaveDriverChampionship(int groupId, [FromBody] List<string> rankedDriverIds)
     {
         try
@@ -97,6 +101,7 @@ public class PredictionsController : ControllerBase
 
     // Driver Draft
     [HttpPost("groups/{groupId}/driver-draft")]
+    [EnableRateLimiting("write")]
     public async Task<IActionResult> SaveDriverDraft(int groupId, [FromBody] DriverDraftRequest request)
     {
         try
@@ -133,6 +138,7 @@ public class PredictionsController : ControllerBase
 
     // Destructor
     [HttpPost("groups/{groupId}/destructor")]
+    [EnableRateLimiting("write")]
     public async Task<IActionResult> SaveDestructor(int groupId, [FromBody] TwoDriverRequest request)
     {
         try
@@ -169,6 +175,7 @@ public class PredictionsController : ControllerBase
 
     // Mr Saturday
     [HttpPost("groups/{groupId}/mr-saturday")]
+    [EnableRateLimiting("write")]
     public async Task<IActionResult> SaveMrSaturday(int groupId, [FromBody] TwoDriverRequest request)
     {
         try
@@ -205,6 +212,7 @@ public class PredictionsController : ControllerBase
 
     // Zero Pointer
     [HttpPost("groups/{groupId}/zero-pointer")]
+    [EnableRateLimiting("write")]
     public async Task<IActionResult> SaveZeroPointer(int groupId, [FromBody] TwoDriverRequest request)
     {
         try
@@ -241,6 +249,7 @@ public class PredictionsController : ControllerBase
 
     // Wildcard
     [HttpPost("groups/{groupId}/wildcard")]
+    [EnableRateLimiting("write")]
     public async Task<IActionResult> SaveWildcard(int groupId, [FromBody] WildcardRequest request)
     {
         try

@@ -1,5 +1,6 @@
 using F1Fantasy.Models;
 using F1Fantasy.Repository;
+using F1Fantasy.Validation;
 
 namespace F1Fantasy.Services;
 
@@ -14,6 +15,10 @@ public class GroupService
 
     public async Task<Group> CreateGroupAsync(string name, string adminUserId, string lockMode)
     {
+        // Validate inputs
+        ValidationExtensions.ValidateGroupName(name);
+        ValidationExtensions.ValidateLockMode(lockMode);
+
         // Generate unique invite code
         var inviteCode = GenerateInviteCode();
         
@@ -89,6 +94,9 @@ public class GroupService
 
     public async Task RenameGroupAsync(int groupId, string userId, string newName)
     {
+        // Validate input first
+        ValidationExtensions.ValidateGroupName(newName);
+
         if (!await _groupRepository.IsUserAdminAsync(groupId, userId))
         {
             throw new UnauthorizedAccessException("Only admin can rename the group");
@@ -98,11 +106,6 @@ public class GroupService
         if (group == null)
         {
             throw new KeyNotFoundException("Group not found");
-        }
-
-        if (string.IsNullOrWhiteSpace(newName))
-        {
-            throw new ArgumentException("Group name cannot be empty");
         }
 
         group.Name = newName;

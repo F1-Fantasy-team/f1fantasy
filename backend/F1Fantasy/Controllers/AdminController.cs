@@ -1,6 +1,7 @@
 using F1Fantasy.Repository;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 
 namespace F1Fantasy.Controllers;
@@ -8,6 +9,7 @@ namespace F1Fantasy.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
+[EnableRateLimiting("admin")]
 public class AdminController : ControllerBase
 {
     private readonly PredictionRepository _predictionRepository;

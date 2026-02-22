@@ -1,6 +1,7 @@
 using F1Fantasy.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 
 namespace F1Fantasy.Controllers;
@@ -8,6 +9,7 @@ namespace F1Fantasy.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
+[EnableRateLimiting("read")]
 public class StandingsController : ControllerBase
 {
     private readonly StandingsService _standingsService;
@@ -36,6 +38,7 @@ public class StandingsController : ControllerBase
     }
 
     [HttpPost("groups/{groupId}/recalculate")]
+    [EnableRateLimiting("write")]
     public async Task<IActionResult> RecalculateStandings(int groupId, [FromQuery] string season = "2026")
     {
         try

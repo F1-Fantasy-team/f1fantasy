@@ -1,6 +1,8 @@
 using F1Fantasy.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 
 namespace F1Fantasy.Controllers;
@@ -8,6 +10,7 @@ namespace F1Fantasy.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
+[EnableRateLimiting("read")] // Default for GET operations
 public class GroupsController : ControllerBase
 {
     private readonly GroupService _groupService;
@@ -24,6 +27,7 @@ public class GroupsController : ControllerBase
     }
 
     [HttpPost]
+    [EnableRateLimiting("write")]
     public async Task<IActionResult> CreateGroup([FromBody] CreateGroupRequest request)
     {
         try
@@ -122,6 +126,7 @@ public class GroupsController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [EnableRateLimiting("write")]
     public async Task<IActionResult> RenameGroup(int id, [FromBody] RenameGroupRequest request)
     {
         try
@@ -237,5 +242,17 @@ public class GroupsController : ControllerBase
     }
 }
 
-public record CreateGroupRequest(string Name, string LockMode);
-public record RenameGroupRequest(string Name);
+public record CreateGroupRequest(
+    [StringLength(100, MinimumLength = 1, ErrorMessage = "Group name must be 1-100 characters")]
+    [RegularExpression(@"^[^<>]*$", ErrorMessage = "Group name contains invalid characters")]
+    string Name,
+    
+    [RegularExpression(@"^(manual|auto|never)$", ErrorMessage = "Lock mode must be 'manual', 'auto', or 'never'")]
+    string LockMode
+);
+
+public record RenameGroupRequest(
+    [StringLength(100, MinimumLength = 1, ErrorMessage = "Group name must be 1-100 characters")]
+    [RegularExpression(@"^[^<>]*$", ErrorMessage = "Group name contains invalid characters")]
+    string Name
+);

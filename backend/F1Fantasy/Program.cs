@@ -1,11 +1,14 @@
 using DotNetEnv;
 using F1Fantasy.Data;
 using F1Fantasy.Middleware;
+using F1Fantasy.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 using System.Text;
+using System.Threading.RateLimiting;
 
 // Load environment variables from .env file in development
 if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development" || 
@@ -95,6 +98,10 @@ builder.Services.AddScoped<F1Fantasy.Services.PredictionService>();
 builder.Services.AddScoped<F1Fantasy.Services.ScoringService>();
 builder.Services.AddScoped<F1Fantasy.Services.StandingsService>();
 
+// Rate limiting and security services
+builder.Services.AddSingleton<IIpBlacklistService, IpBlacklistService>();
+builder.Services.AddSingleton<RateLimitViolationMonitor>();
+
 // Auto-lock background service
 builder.Services.AddHostedService<F1Fantasy.Services.AutoLockService>();
 
@@ -146,6 +153,83 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
+// Configure Rate Limiting
+builder.Services.AddRateLimiter(options =>
+{
+    // Global fallback - applies to all endpoints not specifically configured
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+    {
+        var ipAddress = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: ipAddress,
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 200,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0 // No queueing - reject immediately when limit exceeded
+            });
+    });
+
+    // Policy for read operations (GET requests)
+    options.AddPolicy("read", context =>
+    {
+        var userId = context.User.FindFirst("sub")?.Value ?? 
+                     context.Connection.RemoteIpAddress?.ToString() ?? 
+                     "anonymous";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: userId,
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            });
+    });
+
+    // Policy for write operations (POST/PUT/DELETE)
+    options.AddPolicy("write", context =>
+    {
+        var userId = context.User.FindFirst("sub")?.Value ?? 
+                     context.Connection.RemoteIpAddress?.ToString() ?? 
+                     "anonymous";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: userId,
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            });
+    });
+
+    // Policy for admin operations
+    options.AddPolicy("admin", context =>
+    {
+        var userId = context.User.FindFirst("sub")?.Value ?? 
+                     context.Connection.RemoteIpAddress?.ToString() ?? 
+                     "anonymous";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: userId,
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            });
+    });
+
+    // Configure rejection response with violation tracking
+    options.ConfigureRateLimitRejection();
+});
+
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -169,6 +253,9 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Add IP blacklist middleware - MUST be early in pipeline
+app.UseMiddleware<IpBlacklistMiddleware>();
+
 // Add global exception handler middleware
 app.UseMiddleware<GlobalExceptionHandler>();
 
@@ -187,6 +274,9 @@ if (app.Environment.IsDevelopment())
 
 // Enable CORS - must be before UseAuthorization
 app.UseCors("AllowFrontend");
+
+// Enable rate limiting - must be after CORS and before authentication
+app.UseRateLimiter();
 
 // Enable authentication and authorization
 app.UseAuthentication();
