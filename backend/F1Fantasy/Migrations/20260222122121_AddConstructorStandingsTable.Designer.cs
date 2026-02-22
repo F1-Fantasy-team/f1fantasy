@@ -2,6 +2,7 @@
 using F1Fantasy.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -10,9 +11,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace F1Fantasy.Migrations
 {
     [DbContext(typeof(F1FantasyDbContext))]
-    partial class F1FantasyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260222122121_AddConstructorStandingsTable")]
+    partial class AddConstructorStandingsTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -476,17 +479,11 @@ namespace F1Fantasy.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<string>("StatusId")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
                     b.HasKey("Id");
 
                     b.HasIndex("ConstructorId");
 
                     b.HasIndex("DriverId");
-
-                    b.HasIndex("StatusId");
 
                     b.HasIndex("Season", "Round");
 
@@ -509,29 +506,6 @@ namespace F1Fantasy.Migrations
                     b.HasKey("Year");
 
                     b.ToTable("Seasons");
-                });
-
-            modelBuilder.Entity("F1Fantasy.Models.Status", b =>
-                {
-                    b.Property<string>("StatusId")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("Count")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("StatusText")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.HasKey("StatusId");
-
-                    b.HasIndex("StatusText");
-
-                    b.ToTable("Statuses");
                 });
 
             modelBuilder.Entity("F1Fantasy.Models.Circuit", b =>

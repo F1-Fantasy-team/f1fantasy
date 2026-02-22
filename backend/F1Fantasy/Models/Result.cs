@@ -15,7 +15,8 @@ public class Result
     public Constructor Constructor { get; set; } = new();
     public string Grid { get; set; } = string.Empty;
     public string Laps { get; set; } = string.Empty;
-    public string Status { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty; // Status text (e.g., "Finished", "Engine")
+    public string? StatusId { get; set; } // Foreign key to Status table (e.g., "1", "5")
     public ResultTime? Time { get; set; }
     public FastestLap? FastestLap { get; set; }
     public bool IsSprint { get; set; } = false; // Indicates if this is a sprint race result
