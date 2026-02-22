@@ -518,13 +518,31 @@ All prediction endpoints require authentication. Replace `{groupId}` with the gr
 
 ### Admin Endpoints
 
-All admin endpoints require the user to be the group admin.
+All admin endpoints require the user to be the group admin (except populate-season which is system-level).
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/admin/wildcard/{id}/points?points={amount}` | Set wildcard points (100-200) |
-| POST | `/api/admin/wildcard/{id}/fulfill` | Mark wildcard as fulfilled |
+| PUT | `/api/admin/groups/{groupId}/wildcard/{userId}/points` | Set wildcard points (100-200) |
+| PUT | `/api/admin/groups/{groupId}/wildcard/{userId}/fulfilled` | Mark wildcard as fulfilled |
 | GET | `/api/admin/groups/{groupId}/wildcards` | Get all wildcards in a group |
+| POST | `/api/admin/populate-season/{season}` | Populate driver/constructor data for a season |
+
+#### Populate Season (System Admin)
+```http
+POST /api/admin/populate-season/2026
+Authorization: Bearer YOUR_TOKEN
+```
+
+Response:
+```json
+{
+  "message": "Successfully populated season 2026",
+  "driversCount": 20,
+  "constructorsCount": 10
+}
+```
+
+**Purpose**: Fetches all drivers and constructors for the specified season from the Ergast API and adds the season to their `ActiveSeasons` list. This should be called at the start of each season (especially during preseason) to ensure active participants are tracked before race standings exist.
 
 ## Category Scoring Rules
 
