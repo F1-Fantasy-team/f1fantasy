@@ -9,14 +9,24 @@ Frontend will send/receive these shapes. All IDs are strings. Driver and constru
 What we need per group.
 
 ```ts
+type PredictionLockMode = "admin" | "system" | "hybrid";
+
 interface Group {
   id: string;           // UUID or slug
   name: string;
   memberCount: number;
   createdAt: string;   // ISO 8601, e.g. "2025-01-15T10:00:00Z"
   inviteCode?: string; // optional, e.g. "LEGEND24"
+  adminUserId?: string; // group creator; can lock/unlock in admin/hybrid mode
+  predictionLockMode?: PredictionLockMode; // default "hybrid"
 }
 ```
+
+**Prediction lock modes:**
+
+- **admin** — Only the admin can lock/unlock predictions for the group (anytime).
+- **system** — Lock is determined by backend: `predictionLock` flag and, when false, today’s date vs `firstRaceDate` (season start). No manual override.
+- **hybrid** (default) — Same as system, but the admin can override lock/unlock manually.
 
 ---
 
@@ -115,7 +125,11 @@ Users can “lock” predictions (no more edits). We need to know who has locked
 lockedUserIds: string[]  // e.g. ["user_1", "user_2"]
 ```
 
-Once season has started, frontend treats lock as irreversible (no unlock).
+Lock behaviour depends on the group’s `predictionLockMode` and backend data:
+
+- **System / hybrid:** Backend can send `predictionLock: boolean`. If `true`, predictions stay locked. If `false`, frontend compares today’s date to `firstRaceDate` (first race of season): before → unlocked, on or after → locked. If no backend data yet, frontend assumes locked.
+- **Hybrid:** Admin can override with `adminLockOverride: true | false`.
+- **Admin:** Group uses `adminSetPredictionsLocked` only; admin can lock/unlock anytime.
 
 ---
 
@@ -129,12 +143,20 @@ interface GroupPredictionsData {
   standings: MemberStanding[];
   predictions: UserPredictions[];
   lockedUserIds?: string[];
+  predictionLock?: boolean;   // from backend: if true, predictions stay locked
+  firstRaceDate?: string;   // ISO date of first race, e.g. "2026-03-01"
+  adminLockOverride?: boolean;  // hybrid: admin override (true = locked, false = unlocked)
+  adminSetPredictionsLocked?: boolean;  // admin mode: admin has locked the group
 }
 ```
 
 - **standings** — one entry per member, with `overallScore`, `rank`, `categoryScores` (one per category).
 - **predictions** — one entry per member, with their raw prediction data (see §2).
 - **lockedUserIds** — list of user IDs that have locked for this group.
+- **predictionLock** — when true, frontend treats predictions as locked (system/hybrid). When false, frontend uses `firstRaceDate` vs today to decide.
+- **firstRaceDate** — used when `predictionLock` is false to determine if season has started.
+- **adminLockOverride** — (hybrid) when set, overrides system lock.
+- **adminSetPredictionsLocked** — (admin mode) when true, group predictions are locked.
 
 ---
 

@@ -63,4 +63,12 @@ export interface GroupPredictionsData {
   predictions: UserPredictions[];
   /** User IDs who have locked their predictions (no edits allowed). */
   lockedUserIds?: string[];
+  /** From backend: when true, predictions stay locked forever (system/hybrid). */
+  predictionLock?: boolean;
+  /** From backend: ISO date of first race (e.g. "2026-03-01"). Used when predictionLock is false. */
+  firstRaceDate?: string;
+  /** Hybrid mode: admin override. When set, overrides system lock. */
+  adminLockOverride?: boolean;
+  /** Admin mode: admin has locked predictions for the whole group. */
+  adminSetPredictionsLocked?: boolean;
 }

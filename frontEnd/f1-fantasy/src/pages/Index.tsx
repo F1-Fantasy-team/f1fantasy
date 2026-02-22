@@ -3,7 +3,7 @@ import { useUser } from "@clerk/clerk-react";
 import { message } from "antd";
 import { useRecoilState, useSetRecoilState, useRecoilValue } from "recoil";
 import { AuthTemplate, DashboardTemplate } from "../templates";
-import { LandingHeroWithSignIn, DashboardContent, GroupPredictionsView, CategoryDetailView } from "../organisms";
+import { LandingHeroWithSignIn, DashboardContent, InfoBanner, GroupPredictionsView, CategoryDetailView } from "../organisms";
 import { LoadingScreen } from "../atoms";
 import { CreateGroupModal, JoinGroupModal } from "../molecules";
 import { userGroupsState, selectedGroupIdState, allGroupsState, selectedCategoryIdState, groupPredictionsState, driversState, constructorsState, driversFromApiState, constructorsFromApiState } from "../state/atoms";
@@ -126,6 +126,7 @@ export default function Index() {
       <DashboardTemplate>
         {selectedCategoryId ? (
           <CategoryDetailView
+            group={selectedGroup}
             categoryId={selectedCategoryId as PredictionCategoryId}
             data={data}
             setData={setGroupData}
@@ -169,7 +170,7 @@ export default function Index() {
   };
 
   return (
-    <DashboardTemplate>
+    <DashboardTemplate topSection={<InfoBanner />}>
       <DashboardContent
         groups={userGroups}
         onCreateGroup={() => setCreateGroupModalOpen(true)}
@@ -177,11 +178,13 @@ export default function Index() {
           setJoinInitialCode(undefined);
           setJoinGroupModalOpen(true);
         }}
+        showBanner={false}
       />
       <CreateGroupModal
         open={createGroupModalOpen}
         onClose={() => setCreateGroupModalOpen(false)}
         onCreated={handleGroupCreated}
+        currentUserId={currentUserId}
       />
       <JoinGroupModal
         open={joinGroupModalOpen}
