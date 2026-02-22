@@ -11,6 +11,7 @@ public class StandingsService
     private readonly PredictionRepository _predictionRepository;
     private readonly ScoringService _scoringService;
     private readonly ResultService _resultService;
+    private readonly ResultRepository _resultRepository;
     private readonly ILogger<StandingsService> _logger;
 
     public StandingsService(
@@ -19,6 +20,7 @@ public class StandingsService
         PredictionRepository predictionRepository,
         ScoringService scoringService,
         ResultService resultService,
+        ResultRepository resultRepository,
         ILogger<StandingsService> logger)
     {
         _standingRepository = standingRepository;
@@ -26,6 +28,7 @@ public class StandingsService
         _predictionRepository = predictionRepository;
         _scoringService = scoringService;
         _resultService = resultService;
+        _resultRepository = resultRepository;
         _logger = logger;
     }
 
@@ -39,13 +42,22 @@ public class StandingsService
         // Get existing standings
         var existingStandings = await _standingRepository.GetStandingsByGroupAsync(groupId);
         
-        // Use ResultService which will fetch from API if needed and cache in repository
+        // Use ResultService which will intelligently fetch from API only if needed
         var latestRoundWithResults = await _resultService.GetLatestRoundWithResultsAsync(season);
         
         if (latestRoundWithResults == null)
         {
             _logger.LogDebug("No race results available for season {Season}, returning existing standings", season);
             return existingStandings;
+        }
+        
+        // Verify the latest round data is actually in our database
+        var latestRoundResults = await _resultRepository.GetByRaceAsync(season, latestRoundWithResults.Value.ToString());
+        if (!latestRoundResults.Any())
+        {
+            _logger.LogWarning("Latest round {Round} reported but no results in DB, forcing recalculation", latestRoundWithResults);
+            await RecalculateStandingsAsync(groupId, season);
+            return await _standingRepository.GetStandingsByGroupAsync(groupId);
         }
         
         // Determine last calculated round from existing standings
@@ -61,6 +73,14 @@ public class StandingsService
                 {
                     lastCalculatedRound = detailedStanding.RoundScores.Max(rs => int.Parse(rs.Round));
                     _logger.LogDebug("Last calculated round for group {GroupId}: {Round}", groupId, lastCalculatedRound);
+                    
+                    // Verify that the calculated round actually has results in DB
+                    var calculatedRoundResults = await _resultRepository.GetByRaceAsync(season, lastCalculatedRound.Value.ToString());
+                    if (!calculatedRoundResults.Any())
+                    {
+                        _logger.LogWarning("Last calculated round {Round} has no results in DB, forcing recalculation", lastCalculatedRound);
+                        lastCalculatedRound = null; // Force recalc
+                    }
                 }
             }
             catch (Exception ex)
