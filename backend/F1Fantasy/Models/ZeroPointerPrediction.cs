@@ -6,9 +6,8 @@ public class ZeroPointerPrediction
     public required string UserId { get; set; } // Clerk user ID
     public int GroupId { get; set; }
     
-    // Up to 2 drivers who will score 0 championship points (nullable for partial drafts)
-    public string? Driver1Id { get; set; }
-    public string? Driver2Id { get; set; }
+    // List of drivers predicted to score 0 championship points (can be empty or any number of drivers)
+    public List<string> DriverIds { get; set; } = new List<string>();
     
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }

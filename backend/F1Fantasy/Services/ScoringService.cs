@@ -18,6 +18,7 @@ public class ScoringService
     private const int DESTRUCTOR_DNF_POINTS = 20;
     private const int MR_SATURDAY_QUALI_WIN_POINTS = 10;
     private const int ZERO_POINTER_POINTS = 100;
+    private const int ZERO_POINTER_PENALTY = -20;
 
     public ScoringService(
         PredictionRepository predictionRepository,
@@ -190,7 +191,7 @@ public class ScoringService
     public async Task<int> CalculateZeroPointerScoreAsync(int groupId, string userId, string season)
     {
         var prediction = await _predictionRepository.GetZeroPointerAsync(groupId, userId);
-        if (prediction == null) return 0;
+        if (prediction == null || prediction.DriverIds == null || !prediction.DriverIds.Any()) return 0;
 
         // Use cache-first method for better performance
         var standingsList = await _driverStandingService.GetDriverStandingsBySeasonCachedAsync(season);
@@ -198,22 +199,23 @@ public class ScoringService
         
         int totalScore = 0;
 
-        // Check if predicted drivers have 0 points
-        if (prediction.Driver1Id != null)
+        // Check each predicted driver
+        foreach (var driverId in prediction.DriverIds)
         {
-            var driver1Standing = standingsList.DriverStandings.FirstOrDefault(s => s.Driver?.DriverId == prediction.Driver1Id);
-            if (driver1Standing != null && int.Parse(driver1Standing.Points) == 0)
+            var driverStanding = standingsList.DriverStandings.FirstOrDefault(s => s.Driver?.DriverId == driverId);
+            if (driverStanding != null)
             {
-                totalScore += ZERO_POINTER_POINTS;
-            }
-        }
-
-        if (prediction.Driver2Id != null)
-        {
-            var driver2Standing = standingsList.DriverStandings.FirstOrDefault(s => s.Driver?.DriverId == prediction.Driver2Id);
-            if (driver2Standing != null && int.Parse(driver2Standing.Points) == 0)
-            {
-                totalScore += ZERO_POINTER_POINTS;
+                var points = int.Parse(driverStanding.Points);
+                if (points == 0)
+                {
+                    // Correct prediction: driver has 0 points
+                    totalScore += ZERO_POINTER_POINTS;
+                }
+                else
+                {
+                    // Incorrect prediction: driver has points
+                    totalScore += ZERO_POINTER_PENALTY;
+                }
             }
         }
 

@@ -44,7 +44,9 @@ public class ResultServiceIntegrationTests : IDisposable
             .Options;
         _context = new F1FantasyDbContext(options);
         _resultRepository = new ResultRepository(_context, NullLogger<ResultRepository>.Instance);
-        _resultService = new ResultService(_httpClient, _resultRepository, NullLogger<ResultService>.Instance);
+        var metadataRepository = new DataFetchMetadataRepository(_context, NullLogger<DataFetchMetadataRepository>.Instance);
+        var raceRepository = new RaceRepository(_context, NullLogger<RaceRepository>.Instance);
+        _resultService = new ResultService(_httpClient, _resultRepository, metadataRepository, raceRepository, NullLogger<ResultService>.Instance);
     }
 
     [Fact]

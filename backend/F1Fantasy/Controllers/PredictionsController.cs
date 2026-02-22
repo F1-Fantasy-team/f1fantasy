@@ -213,12 +213,12 @@ public class PredictionsController : ControllerBase
     // Zero Pointer
     [HttpPost("groups/{groupId}/zero-pointer")]
     [EnableRateLimiting("write")]
-    public async Task<IActionResult> SaveZeroPointer(int groupId, [FromBody] TwoDriverRequest request)
+    public async Task<IActionResult> SaveZeroPointer(int groupId, [FromBody] DriverListRequest request)
     {
         try
         {
             var userId = GetUserId();
-            var prediction = await _predictionService.SaveZeroPointerAsync(groupId, userId, request.Driver1Id, request.Driver2Id);
+            var prediction = await _predictionService.SaveZeroPointerAsync(groupId, userId, request.DriverIds);
             return Ok(prediction);
         }
         catch (ArgumentException ex)
@@ -287,4 +287,5 @@ public class PredictionsController : ControllerBase
 
 public record DriverDraftRequest(string? Driver1Id, string? Driver2Id);
 public record TwoDriverRequest(string? Driver1Id, string? Driver2Id);
+public record DriverListRequest(List<string> DriverIds);
 public record WildcardRequest(string? Statement);

@@ -206,8 +206,7 @@ public class PredictionRepository
         
         if (existing != null)
         {
-            existing.Driver1Id = prediction.Driver1Id;
-            existing.Driver2Id = prediction.Driver2Id;
+            existing.DriverIds = prediction.DriverIds;
             existing.UpdatedAt = DateTime.UtcNow;
             _context.ZeroPointerPredictions.Update(existing);
         }

@@ -209,17 +209,22 @@ GET /api/predictions/groups/1/mr-saturday
 Authorization: Bearer YOUR_TOKEN
 ```
 
-### 8. Submit Zero Pointer Prediction (2 drivers who won't score)
+### 8. Submit Zero Pointer Prediction (unlimited drivers - penalty for wrong guesses)
 ```http
 POST /api/predictions/groups/1/zero-pointer
 Authorization: Bearer YOUR_TOKEN
 Content-Type: application/json
 
 {
-  "driver1Id": "zhou_guanyu",
-  "driver2Id": "logan_sargeant"
+  "driverIds": [
+    "zhou_guanyu",
+    "logan_sargeant",
+    "valtteri_bottas"
+  ]
 }
 ```
+
+**Note**: Can submit 0 to unlimited drivers. +100 points per correct prediction (driver scores 0), -20 penalty per incorrect prediction (driver has points).
 
 ### 8a. Get Zero Pointer Prediction
 ```http
@@ -308,11 +313,18 @@ Response:
 - Both drivers must exist in database
 - Nullable fields allow partial submissions before lock
 
-### Destructors / Mr Saturday / Zero Pointers
+### Destructors / Mr Saturday
 - Must select exactly 2 drivers
 - No duplicates allowed
 - Both drivers must exist in database
 - Nullable fields allow partial submissions before lock
+
+### Zero Pointers
+- Can select 0 to unlimited drivers
+- No duplicates allowed
+- All driver IDs must exist in database
+- Empty list allowed (scores 0 points)
+- Scoring: +100 per correct (driver has 0 points), -20 per incorrect (driver has points)
 
 ### Wildcard
 - Statement max 500 characters
@@ -446,7 +458,11 @@ All prediction endpoints require authentication. Replace `{groupId}` with the gr
 | GET | `/api/predictions/groups/{groupId}/destructor` | Get your destructor prediction |
 | POST | `/api/predictions/groups/{groupId}/mr-saturday` | Submit Mr Saturday prediction (2 drivers for poles) |
 | GET | `/api/predictions/groups/{groupId}/mr-saturday` | Get your Mr Saturday prediction |
-| POST | `/api/predictions/groups/{groupId}/zero-pointer` | Submit zero pointer prediction (2 drivers with 0 pts) |
+
+#### Zero Pointer (Unlimited Drivers)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/predictions/groups/{groupId}/zero-pointer` | Submit zero pointer prediction (unlimited drivers) |
 | GET | `/api/predictions/groups/{groupId}/zero-pointer` | Get your zero pointer prediction |
 
 #### Wildcard
@@ -520,7 +536,7 @@ All admin endpoints require the user to be the group admin.
 **Season-End Categories** (only appear in final round):
 - **Driver Championship**: 10 points exact match, -2 per position delta for ALL drivers
 - **Constructor Championship**: 10 points exact match, -2 per position delta for ALL constructors
-- **Zero Pointers**: 100 points if correct (both drivers score 0 all season)
+- **Zero Pointers**: +100 per correct prediction (driver has 0 points), -20 per incorrect (driver has points)
 - **Wildcard**: 100-200 points (admin sets amount and marks fulfilled)
 
 ## Request Formats
@@ -558,7 +574,7 @@ All admin endpoints require the user to be the group admin.
 
 *Must include ALL active constructors (exactly 10)*
 
-### Two-Driver Categories (Driver Draft, Destructor, Mr Saturday, Zero Pointer)
+### Two-Driver Categories (Driver Draft, Destructor, Mr Saturday)
 ```json
 {
   "driver1Id": "max_verstappen",
@@ -567,6 +583,19 @@ All admin endpoints require the user to be the group admin.
 ```
 
 *Both fields nullable for partial submissions before lock*
+
+### Zero Pointer (Unlimited Drivers)
+```json
+{
+  "driverIds": [
+    "zhou_guanyu",
+    "valtteri_bottas",
+    "logan_sargeant"
+  ]
+}
+```
+
+*Array can be empty or contain any number of driver IDs. No duplicates allowed. Scoring: +100 per correct (0 points), -20 per incorrect (has points)*
 
 ### Wildcard
 ```json

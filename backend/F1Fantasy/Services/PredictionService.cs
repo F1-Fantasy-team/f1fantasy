@@ -265,34 +265,33 @@ public class PredictionService
 
     // Zero Pointer
     public async Task<ZeroPointerPrediction> SaveZeroPointerAsync(
-        int groupId, string userId, string? driver1Id, string? driver2Id)
+        int groupId, string userId, List<string> driverIds)
     {
         await ValidateGroupAndLockAsync(groupId, userId);
 
-        if (driver1Id != null && driver2Id != null && driver1Id == driver2Id)
+        // Check for duplicates
+        if (driverIds.Count != driverIds.Distinct().Count())
         {
-            throw new ArgumentException("Cannot select the same driver twice");
+            throw new ArgumentException("Cannot select the same driver multiple times");
         }
 
+        // Validate all driver IDs exist
         var allDrivers = await _driverRepository.GetAllAsync();
-        var driverIds = allDrivers.Select(d => d.DriverId).ToList();
+        var validDriverIds = allDrivers.Select(d => d.DriverId).ToList();
 
-        if (driver1Id != null && !driverIds.Contains(driver1Id))
+        foreach (var driverId in driverIds)
         {
-            throw new ArgumentException("Invalid driver1 ID");
-        }
-
-        if (driver2Id != null && !driverIds.Contains(driver2Id))
-        {
-            throw new ArgumentException("Invalid driver2 ID");
+            if (!validDriverIds.Contains(driverId))
+            {
+                throw new ArgumentException($"Invalid driver ID: {driverId}");
+            }
         }
 
         var prediction = new ZeroPointerPrediction
         {
             GroupId = groupId,
             UserId = userId,
-            Driver1Id = driver1Id,
-            Driver2Id = driver2Id
+            DriverIds = driverIds
         };
 
         return await _predictionRepository.UpsertZeroPointerAsync(prediction);

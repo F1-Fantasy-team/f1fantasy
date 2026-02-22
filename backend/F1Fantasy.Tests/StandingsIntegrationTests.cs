@@ -25,6 +25,8 @@ public class StandingsIntegrationTests : IDisposable
     private readonly QualifyingRepository _qualifyingRepository;
     private readonly DriverStandingRepository _driverStandingRepository;
     private readonly ConstructorStandingRepository _constructorStandingRepository;
+    private readonly DataFetchMetadataRepository _metadataRepository;
+    private readonly RaceRepository _raceRepository;
     private readonly HttpClient _httpClient;
     private readonly ResultService _resultService;
     private readonly QualifyingService _qualifyingService;
@@ -66,10 +68,12 @@ public class StandingsIntegrationTests : IDisposable
         _qualifyingRepository = new QualifyingRepository(_context, NullLogger<QualifyingRepository>.Instance);
         _driverStandingRepository = new DriverStandingRepository(_context, NullLogger<DriverStandingRepository>.Instance);
         _constructorStandingRepository = new ConstructorStandingRepository(_context, NullLogger<ConstructorStandingRepository>.Instance);
+        _metadataRepository = new DataFetchMetadataRepository(_context, NullLogger<DataFetchMetadataRepository>.Instance);
+        _raceRepository = new RaceRepository(_context, NullLogger<RaceRepository>.Instance);
         
         // Initialize HTTP client and F1 data services
         _httpClient = new HttpClient();
-        _resultService = new ResultService(_httpClient, _resultRepository, NullLogger<ResultService>.Instance);
+        _resultService = new ResultService(_httpClient, _resultRepository, _metadataRepository, _raceRepository, NullLogger<ResultService>.Instance);
         _qualifyingService = new QualifyingService(_httpClient, _qualifyingRepository, NullLogger<QualifyingService>.Instance);
         _driverStandingService = new DriverStandingService(_httpClient, _driverStandingRepository, NullLogger<DriverStandingService>.Instance);
         _constructorStandingService = new ConstructorStandingService(_httpClient, _constructorStandingRepository, NullLogger<ConstructorStandingService>.Instance);
@@ -88,6 +92,7 @@ public class StandingsIntegrationTests : IDisposable
             _predictionRepository,
             _scoringService,
             _resultService,
+            _resultRepository,
             NullLogger<StandingsService>.Instance);
     }
 
@@ -342,13 +347,12 @@ public class StandingsIntegrationTests : IDisposable
             CreatedAt = DateTime.UtcNow.AddDays(-8)
         });
 
-        // Zero Pointer: De Vries scored 0 points in 2023
+        // Zero Pointer: De Vries scored 0 points in 2023, Sargeant scored 1 point
         await _predictionRepository.UpsertZeroPointerAsync(new ZeroPointerPrediction
         {
             GroupId = groupId,
             UserId = "user_alice",
-            Driver1Id = "de_vries",
-            Driver2Id = "sargeant", // Sargeant scored 1 point, so this is wrong
+            DriverIds = new List<string> { "de_vries", "sargeant" }, // de_vries=correct (+100), sargeant=wrong (-20)
             CreatedAt = DateTime.UtcNow.AddDays(-8)
         });
 
@@ -427,8 +431,7 @@ public class StandingsIntegrationTests : IDisposable
         {
             GroupId = groupId,
             UserId = "user_bob",
-            Driver1Id = "lawson",
-            Driver2Id = "hulkenberg",
+            DriverIds = new List<string> { "lawson", "hulkenberg" },
             CreatedAt = DateTime.UtcNow.AddDays(-10)
         });
 
@@ -507,8 +510,7 @@ public class StandingsIntegrationTests : IDisposable
         {
             GroupId = groupId,
             UserId = "user_charlie",
-            Driver1Id = "de_vries",
-            Driver2Id = "lawson", // Lawson scored 2 points, so partially wrong
+            DriverIds = new List<string> { "de_vries", "lawson" }, // de_vries=correct (+100), lawson=wrong (-20)
             CreatedAt = DateTime.UtcNow.AddDays(-6)
         });
 
@@ -589,8 +591,7 @@ public class StandingsIntegrationTests : IDisposable
         {
             GroupId = groupId,
             UserId = "user_diana",
-            Driver1Id = "de_vries",
-            Driver2Id = "max_verstappen", // Verstappen scored 575, so wrong
+            DriverIds = new List<string> { "de_vries", "max_verstappen" }, // de_vries=correct (+100), verstappen=wrong (-20)
             CreatedAt = DateTime.UtcNow.AddDays(-4)
         });
 
@@ -603,6 +604,145 @@ public class StandingsIntegrationTests : IDisposable
             Fullfilled = false,
             CreatedAt = DateTime.UtcNow.AddDays(-3)
         });
+    }
+
+    [Fact]
+    public async Task ZeroPointerScoring_CalculatesCorrectlyWithPenalties()
+    {
+        // Arrange
+        var group = await CreateTestGroupAsync();
+        _testGroupId = group.Id;
+        await AddMembersToGroupAsync(group.Id);
+
+        // Fetch 2023 driver standings to identify drivers with 0 points
+        var standings = await _driverStandingService.GetDriverStandingsBySeasonAsync(Season);
+        var driversWithZeroPoints = standings!.DriverStandings!
+            .Where(s => int.Parse(s.Points) == 0)
+            .Select(s => s.Driver!.DriverId)
+            .Take(3) // Take 3 drivers with 0 points
+            .ToList();
+
+        var driversWithPoints = standings!.DriverStandings!
+            .Where(s => int.Parse(s.Points) > 0)
+            .Select(s => s.Driver!.DriverId)
+            .Take(2) // Take 2 drivers with points
+            .ToList();
+
+        // Create prediction with mix of correct (0 points) and incorrect (has points) predictions
+        var prediction = new ZeroPointerPrediction
+        {
+            GroupId = group.Id,
+            UserId = "user_alice",
+            DriverIds = new List<string>(driversWithZeroPoints.Concat(driversWithPoints)),
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _predictionRepository.UpsertZeroPointerAsync(prediction);
+
+        // Act
+        var score = await _scoringService.CalculateZeroPointerScoreAsync(group.Id, "user_alice", Season);
+
+        // Assert
+        var expectedScore = (driversWithZeroPoints.Count * 100) + (driversWithPoints.Count * -20);
+        score.Should().Be(expectedScore, 
+            $"should give +100 for each of {driversWithZeroPoints.Count} correct predictions and -20 for each of {driversWithPoints.Count} incorrect predictions");
+
+        // Verify detailed calculation
+        var correctPredictions = driversWithZeroPoints.Count;
+        var incorrectPredictions = driversWithPoints.Count;
+        score.Should().Be((correctPredictions * 100) + (incorrectPredictions * -20));
+    }
+
+    [Fact]
+    public async Task ZeroPointerScoring_EmptyList_ReturnsZero()
+    {
+        // Arrange
+        var group = await CreateTestGroupAsync();
+        _testGroupId = group.Id;
+        await AddMembersToGroupAsync(group.Id);
+
+        var prediction = new ZeroPointerPrediction
+        {
+            GroupId = group.Id,
+            UserId = "user_alice",
+            DriverIds = new List<string>(),
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _predictionRepository.UpsertZeroPointerAsync(prediction);
+
+        // Act
+        var score = await _scoringService.CalculateZeroPointerScoreAsync(group.Id, "user_alice", Season);
+
+        // Assert
+        score.Should().Be(0, "empty prediction list should return 0 points");
+    }
+
+    [Fact]
+    public async Task ZeroPointerScoring_AllCorrect_GivesFullPoints()
+    {
+        // Arrange
+        var group = await CreateTestGroupAsync();
+        _testGroupId = group.Id;
+        await AddMembersToGroupAsync(group.Id);
+
+        // Fetch drivers with 0 points
+        var standings = await _driverStandingService.GetDriverStandingsBySeasonAsync(Season);
+        var driversWithZeroPoints = standings!.DriverStandings!
+            .Where(s => int.Parse(s.Points) == 0)
+            .Select(s => s.Driver!.DriverId)
+            .Take(5)
+            .ToList();
+
+        var prediction = new ZeroPointerPrediction
+        {
+            GroupId = group.Id,
+            UserId = "user_alice",
+            DriverIds = driversWithZeroPoints,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _predictionRepository.UpsertZeroPointerAsync(prediction);
+
+        // Act
+        var score = await _scoringService.CalculateZeroPointerScoreAsync(group.Id, "user_alice", Season);
+
+        // Assert
+        score.Should().Be(driversWithZeroPoints.Count * 100, "all correct predictions should give 100 points each");
+    }
+
+    [Fact]
+    public async Task ZeroPointerScoring_AllIncorrect_GivesPenalties()
+    {
+        // Arrange
+        var group = await CreateTestGroupAsync();
+        _testGroupId = group.Id;
+        await AddMembersToGroupAsync(group.Id);
+
+        // Fetch drivers with points (top drivers)
+        var standings = await _driverStandingService.GetDriverStandingsBySeasonAsync(Season);
+        var driversWithPoints = standings!.DriverStandings!
+            .Where(s => int.Parse(s.Points) > 0)
+            .Select(s => s.Driver!.DriverId)
+            .Take(3)
+            .ToList();
+
+        var prediction = new ZeroPointerPrediction
+        {
+            GroupId = group.Id,
+            UserId = "user_alice",
+            DriverIds = driversWithPoints,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _predictionRepository.UpsertZeroPointerAsync(prediction);
+
+        // Act
+        var score = await _scoringService.CalculateZeroPointerScoreAsync(group.Id, "user_alice", Season);
+
+        // Assert
+        score.Should().Be(driversWithPoints.Count * -20, "all incorrect predictions should give -20 penalty each");
+        score.Should().BeNegative("predicting drivers with points as zero-pointers should result in negative score");
     }
 
     private string GenerateRandomInviteCode()
