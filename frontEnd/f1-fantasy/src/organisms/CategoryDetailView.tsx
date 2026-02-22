@@ -1,18 +1,21 @@
 import { useSetRecoilState } from "recoil";
 import { ArrowLeftOutlined } from "@ant-design/icons";
+import { InputNumber, Checkbox } from "antd";
 import { F1Button, F1Title, F1Text, F1Card } from "../atoms";
 import { PredictionContent, getDriverName, getConstructorName } from "../molecules/YourPredictionContent";
 import { DriversChampionshipEditor } from "../molecules/DriversChampionshipEditor";
 import { ConstructorsChampionshipEditor } from "../molecules/ConstructorsChampionshipEditor";
 import { TwoDriverPicker } from "../molecules/TwoDriverPicker";
 import { ZeroPointersEditor } from "../molecules/ZeroPointersEditor";
+import { WildcardEditor } from "../molecules/WildcardEditor";
 import { CATEGORY_LABELS, CATEGORY_DESCRIPTIONS } from "../constants/predictionCategories";
 import { selectedCategoryIdState } from "../state/atoms";
 import { useDrivers, useConstructors } from "../state/useDriversAndConstructors";
-import { isUserLocked } from "../utils/predictionLock";
+import { isUserLocked, isGroupAdmin } from "../utils/predictionLock";
 import type { Group } from "../types/group";
 import type { PredictionCategoryId } from "../types/predictions";
 import type { GroupPredictionsData } from "../types/predictions";
+import type { WildcardPrediction } from "../types/predictions";
 import type { Driver } from "../types/driver";
 import type { Constructor } from "../types/constructor";
 
@@ -212,6 +215,33 @@ export function CategoryDetailView({ group, categoryId, data, setData, currentUs
     }));
   };
 
+  const handleSaveWildcard = (wildcard: WildcardPrediction) => {
+    setData((prev) => ({
+      ...prev,
+      predictions: prev.predictions.map((p) =>
+        p.userId === currentUserId ? { ...p, wildcard } : p
+      ),
+    }));
+  };
+
+  const handleAdminSetWildcard = (
+    userId: string,
+    updates: { pointsPotential?: number; fulfilled?: boolean }
+  ) => {
+    setData((prev) => ({
+      ...prev,
+      predictions: prev.predictions.map((p) => {
+        if (p.userId !== userId || !p.wildcard) return p;
+        return {
+          ...p,
+          wildcard: { ...p.wildcard, ...updates },
+        };
+      }),
+    }));
+  };
+
+  const isAdmin = isGroupAdmin(group, currentUserId);
+
   return (
     <div className="min-w-0 space-y-6">
       <F1Button
@@ -286,8 +316,13 @@ export function CategoryDetailView({ group, categoryId, data, setData, currentUs
                   value={myPredictions?.zeroPointers}
                   onSave={handleSaveZeroPointers}
                 />
+              ) : categoryId === "wildcard" ? (
+                <WildcardEditor
+                  value={myPredictions?.wildcard}
+                  onSave={handleSaveWildcard}
+                />
               ) : (
-<>
+                <>
                   <PredictionContent predictions={myPredictions} categoryId={categoryId} drivers={drivers} constructors={constructors} />
                   <p className="mt-2 text-xs text-f1-silver/70">Editing for this category is not available yet.</p>
                 </>
@@ -313,6 +348,56 @@ export function CategoryDetailView({ group, categoryId, data, setData, currentUs
             currentUserId={currentUserId}
             constructors={constructors}
           />
+        ) : categoryId === "wildcard" ? (
+          <div className="flex flex-col gap-4">
+            {data.predictions.map((userPrediction) => {
+              const w = userPrediction.wildcard;
+              const score = data.standings
+                .find((s) => s.userId === userPrediction.userId)
+                ?.categoryScores.find((c) => c.categoryId === "wildcard")?.score;
+              return (
+                <F1Card key={userPrediction.userId} className="!rounded-lg">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <F1Text className={userPrediction.userId === currentUserId ? "text-f1-red font-medium" : ""}>
+                      {getFirstName(userPrediction.displayName)}
+                      {userPrediction.userId === currentUserId ? " (you)" : ""}
+                    </F1Text>
+                    {score !== undefined && (
+                      <span className="text-f1-gold font-mono text-sm">{score} pts</span>
+                    )}
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-f1-gray">
+                    {w?.statement ? (
+                      <F1Text className="italic">"{w.statement}"</F1Text>
+                    ) : (
+                      <F1Text muted>No wildcard yet.</F1Text>
+                    )}
+                    {isAdmin && w?.statement && (
+                      <div className="mt-3 flex flex-wrap items-center gap-4">
+                        <label className="flex items-center gap-2 text-sm text-f1-silver">
+                          <span>Points potential:</span>
+                          <InputNumber
+                            min={1}
+                            max={100}
+                            value={w.pointsPotential ?? 10}
+                            onChange={(val) => handleAdminSetWildcard(userPrediction.userId, { pointsPotential: val ?? undefined })}
+                            className="w-20 bg-f1-gray border-f1-gray text-f1-silver [&_.ant-input-number-input]:bg-transparent"
+                          />
+                        </label>
+                        <Checkbox
+                          checked={w.fulfilled ?? false}
+                          onChange={(e) => handleAdminSetWildcard(userPrediction.userId, { fulfilled: e.target.checked })}
+                          className="text-f1-silver [&_.ant-checkbox-inner]:border-f1-gray [&_.ant-checkbox-checked_.ant-checkbox-inner]:bg-f1-red [&_.ant-checkbox-checked_.ant-checkbox-inner]:border-f1-red"
+                        >
+                          Fulfilled (came true)
+                        </Checkbox>
+                      </div>
+                    )}
+                  </div>
+                </F1Card>
+              );
+            })}
+          </div>
         ) : (
           <div className="flex flex-col gap-4">
             {data.predictions.map((userPrediction) => (

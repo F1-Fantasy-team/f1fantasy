@@ -26,8 +26,14 @@ export type MrSaturdayPrediction = { driverId1: string; driverId2: string };
 /** 0 Pointers: drivers predicted to finish with 0 points */
 export type ZeroPointersPrediction = { driverIds: string[] };
 
-/** Wildcard: free-form statement; points if it comes true */
-export type WildcardPrediction = { statement: string };
+/** Wildcard: one free-form statement per user; points if it comes true. Admin sets points potential and marks fulfilled. */
+export type WildcardPrediction = {
+  statement: string;
+  /** Admin-set: higher = more "unhinged" prediction, higher score potential when fulfilled. */
+  pointsPotential?: number;
+  /** Admin ticks when prediction has come true so points can be counted. */
+  fulfilled?: boolean;
+};
 
 export interface UserPredictions {
   userId: string;

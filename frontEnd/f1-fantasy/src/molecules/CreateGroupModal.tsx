@@ -100,7 +100,7 @@ export function CreateGroupModal({ open, onClose, onCreated, currentUserId }: Cr
       open={open}
       onCancel={handleCancel}
       footer={null}
-      destroyOnClose
+      destroyOnHidden
       width={460}
       centered
       className="create-group-modal max-w-[calc(100vw-2rem)] [&_.ant-modal-content]:overflow-hidden [&_.ant-modal-content]:rounded-2xl [&_.ant-modal-content]:border [&_.ant-modal-content]:border-f1-gray [&_.ant-modal-content]:bg-f1-carbon [&_.ant-modal-content]:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.6)] [&_.ant-modal-header]:border-f1-gray [&_.ant-modal-header]:bg-transparent [&_.ant-modal-body]:pt-6 [&_.ant-modal-close]:text-f1-silver [&_.ant-modal-close]:hover:text-f1-white"
