@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace F1Fantasy.Models;
 
 public class Standing
@@ -15,5 +17,6 @@ public class Standing
     public DateTime UpdatedAt { get; set; }
 
     // Navigation property
+    [JsonIgnore]
     public Group Group { get; set; } = null!;
 }

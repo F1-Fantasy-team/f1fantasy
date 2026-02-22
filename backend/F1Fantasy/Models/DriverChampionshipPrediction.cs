@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace F1Fantasy.Models;
 
 public class DriverChampionshipPrediction
@@ -13,5 +15,6 @@ public class DriverChampionshipPrediction
     public DateTime? UpdatedAt { get; set; }
 
     // Navigation property
+    [JsonIgnore]
     public Group Group { get; set; } = null!;
 }
