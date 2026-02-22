@@ -15,8 +15,12 @@ export function getApiBaseUrl(): string | undefined {
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (authTokenGetter) {
-    const token = await authTokenGetter();
-    if (token) headers.Authorization = `Bearer ${token}`;
+    try {
+      const token = await authTokenGetter();
+      if (token) headers.Authorization = `Bearer ${token}`;
+    } catch (_err) {
+      // Session may be expired or getToken failed; proceed without token so caller can handle 401
+    }
   }
   return headers;
 }

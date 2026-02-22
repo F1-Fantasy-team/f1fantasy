@@ -19,10 +19,13 @@ const f1Theme = {
 /** Registers Clerk session token with the API client so requests send Authorization: Bearer <token>. */
 function ApiAuthSetup() {
     const { getToken } = useAuth();
+    const jwtTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE as string | undefined;
     useEffect(() => {
-        setAuthTokenGetter(() => getToken());
+        setAuthTokenGetter(() =>
+            jwtTemplate ? getToken({ template: jwtTemplate }) : getToken()
+        );
         return () => setAuthTokenGetter(null);
-    }, [getToken]);
+    }, [getToken, jwtTemplate]);
     return null;
 }
 

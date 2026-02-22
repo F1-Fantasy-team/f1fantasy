@@ -127,7 +127,15 @@ function PredictionContent({ predictions, categoryId, drivers, constructors }: P
     case "wildcard": {
       const p = predictions.wildcard;
       if (!p?.statement) return <F1Text muted>No prediction yet.</F1Text>;
-      return <F1Text className="italic">"{p.statement}"</F1Text>;
+      return (
+        <span>
+          <F1Text className="italic">"{p.statement}"</F1Text>
+          {p.pointsPotential != null && (
+            <F1Text muted className="ml-2 text-xs">({p.pointsPotential} pts max)</F1Text>
+          )}
+          {p.fulfilled && <F1Text className="ml-2 text-xs text-f1-gold">✓ Fulfilled</F1Text>}
+        </span>
+      );
     }
     default:
       return null;

@@ -69,7 +69,7 @@ interface UserPredictions {
 | destructors              | `{ driverId1: string; driverId2: string }` |
 | mrSaturday               | `{ driverId1: string; driverId2: string }` |
 | zeroPointers             | `{ driverIds: string[] }` — length 0 to grid size (e.g. 0–22). |
-| wildcard                  | `{ statement: string }` — free text. |
+| wildcard                  | `{ statement: string; pointsPotential?: number; fulfilled?: boolean }` — one per user. Admin sets `pointsPotential` (higher = more “unhinged” = higher score if fulfilled) and ticks `fulfilled` when it comes true so points count. |
 
 **Examples:**
 
