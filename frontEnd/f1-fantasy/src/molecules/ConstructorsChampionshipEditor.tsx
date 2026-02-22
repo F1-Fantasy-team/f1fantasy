@@ -117,7 +117,7 @@ export function ConstructorsChampionshipEditor({ value, onSave }: ConstructorsCh
       <div className="space-y-2">
         <F1Text muted className="block text-sm">
           No constructors loaded. Set <code className="rounded bg-f1-gray px-1 text-xs">VITE_API_BASE_URL</code> and ensure
-          the constructors API returns data for the current season, or add mock constructors for development.
+          the constructors API returns data for the current season.
         </F1Text>
       </div>
     );

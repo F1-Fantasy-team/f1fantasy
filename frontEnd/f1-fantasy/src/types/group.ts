@@ -16,4 +16,8 @@ export interface Group {
   adminUserId?: string;
   /** How prediction lock is determined. Default: "hybrid". */
   predictionLockMode?: PredictionLockMode;
+  /** From backend: when true, predictions are locked for the group. */
+  predictionsLocked?: boolean;
+  /** Member user IDs from API (used as fallback for standings when API returns []). */
+  members?: { userId: string }[];
 }

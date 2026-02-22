@@ -26,9 +26,9 @@ export function WildcardEditor({ value, onSave }: WildcardEditorProps) {
         One wildcard prediction per user. The bolder the claim, the more points the admin can assign if it comes true.
       </F1Text>
       <TextArea
+        placeholder="e.g. Piastri wins a race, or Haas scores a podium..."
         value={statement}
         onChange={(e) => setStatement(e.target.value)}
-        placeholder="e.g. Piastri wins a race, or Haas scores a podium..."
         rows={3}
         maxLength={500}
         showCount

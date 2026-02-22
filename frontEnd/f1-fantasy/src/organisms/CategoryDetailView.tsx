@@ -1,6 +1,7 @@
-import { useSetRecoilState } from "recoil";
+import { useEffect, useState } from "react";
+import { useSetRecoilState, useRecoilValue } from "recoil";
 import { ArrowLeftOutlined } from "@ant-design/icons";
-import { InputNumber, Checkbox } from "antd";
+import { App, InputNumber, Checkbox } from "antd";
 import { F1Button, F1Title, F1Text, F1Card } from "../atoms";
 import { PredictionContent, getDriverName, getConstructorName } from "../molecules/YourPredictionContent";
 import { DriversChampionshipEditor } from "../molecules/DriversChampionshipEditor";
@@ -9,9 +10,16 @@ import { TwoDriverPicker } from "../molecules/TwoDriverPicker";
 import { ZeroPointersEditor } from "../molecules/ZeroPointersEditor";
 import { WildcardEditor } from "../molecules/WildcardEditor";
 import { CATEGORY_LABELS, CATEGORY_DESCRIPTIONS } from "../constants/predictionCategories";
-import { selectedCategoryIdState } from "../state/atoms";
+import { selectedCategoryIdState, firstRaceDateState } from "../state/atoms";
 import { useDrivers, useConstructors } from "../state/useDriversAndConstructors";
 import { isUserLocked, isGroupAdmin } from "../utils/predictionLock";
+import { getApiBaseUrl } from "../api/client";
+import {
+  fetchAdminWildcardsFromApi,
+  putAdminWildcardPointsFromApi,
+  putAdminWildcardFulfilledFromApi,
+  type AdminWildcardApi,
+} from "../api/predictions";
 import type { Group } from "../types/group";
 import type { PredictionCategoryId } from "../types/predictions";
 import type { GroupPredictionsData } from "../types/predictions";
@@ -150,84 +158,145 @@ type CategoryDetailViewProps = {
   data: GroupPredictionsData;
   setData: (data: GroupPredictionsData | ((prev: GroupPredictionsData) => GroupPredictionsData)) => void;
   currentUserId: string;
+  /** When set (e.g. API), saves to backend then parent updates state. Otherwise only setData. */
+  onSavePrediction?: (categoryId: PredictionCategoryId, payload: unknown) => Promise<void>;
 };
 
-export function CategoryDetailView({ group, categoryId, data, setData, currentUserId }: CategoryDetailViewProps) {
+export function CategoryDetailView({ group, categoryId, data, setData, currentUserId, onSavePrediction }: CategoryDetailViewProps) {
+  const { message } = App.useApp();
+  const [adminWildcards, setAdminWildcards] = useState<AdminWildcardApi[] | null>(null);
   const setSelectedCategoryId = useSetRecoilState(selectedCategoryIdState);
+  const firstRaceDateFromRaces = useRecoilValue(firstRaceDateState);
   const drivers = useDrivers();
   const constructors = useConstructors();
   const myStanding = data.standings.find((s) => s.userId === currentUserId);
+  const isAdmin = isGroupAdmin(group, currentUserId);
+
+  useEffect(() => {
+    if (
+      categoryId === "wildcard" &&
+      isAdmin &&
+      getApiBaseUrl()
+    ) {
+      fetchAdminWildcardsFromApi(group.id).then(setAdminWildcards);
+    } else {
+      setAdminWildcards(null);
+    }
+  }, [categoryId, group.id, isAdmin]);
+
   const myScore = myStanding?.categoryScores.find((c) => c.categoryId === categoryId)?.score;
   const myPredictions = data.predictions.find((p) => p.userId === currentUserId);
-  const isLocked = isUserLocked(group, data, currentUserId);
+  const isLocked = isUserLocked(group, data, currentUserId, firstRaceDateFromRaces);
 
-  const handleSaveDriversChampionship = (driversChampionship: { position: number; driverId: string }[]) => {
-    setData((prev) => ({
-      ...prev,
-      predictions: prev.predictions.map((p) =>
-        p.userId === currentUserId ? { ...p, driversChampionship } : p
-      ),
-    }));
+  const handleSaveDriversChampionship = async (driversChampionship: { position: number; driverId: string }[]) => {
+    if (onSavePrediction) {
+      await onSavePrediction("driversChampionship", driversChampionship);
+    } else {
+      setData((prev) => ({
+        ...prev,
+        predictions: prev.predictions.map((p) =>
+          p.userId === currentUserId ? { ...p, driversChampionship } : p
+        ),
+      }));
+    }
   };
 
-  const handleSaveConstructorsChampionship = (constructorsChampionship: { position: number; constructorId: string }[]) => {
-    setData((prev) => ({
-      ...prev,
-      predictions: prev.predictions.map((p) =>
-        p.userId === currentUserId ? { ...p, constructorsChampionship } : p
-      ),
-    }));
+  const handleSaveConstructorsChampionship = async (constructorsChampionship: { position: number; constructorId: string }[]) => {
+    if (onSavePrediction) {
+      await onSavePrediction("constructorsChampionship", constructorsChampionship);
+    } else {
+      setData((prev) => ({
+        ...prev,
+        predictions: prev.predictions.map((p) =>
+          p.userId === currentUserId ? { ...p, constructorsChampionship } : p
+        ),
+      }));
+    }
   };
 
-  const handleSaveDriverDraft = (driverDraft: { driverId1: string; driverId2: string }) => {
-    setData((prev) => ({
-      ...prev,
-      predictions: prev.predictions.map((p) =>
-        p.userId === currentUserId ? { ...p, driverDraft } : p
-      ),
-    }));
+  const handleSaveDriverDraft = async (driverDraft: { driverId1: string; driverId2: string }) => {
+    if (onSavePrediction) {
+      await onSavePrediction("driverDraft", driverDraft);
+    } else {
+      setData((prev) => ({
+        ...prev,
+        predictions: prev.predictions.map((p) =>
+          p.userId === currentUserId ? { ...p, driverDraft } : p
+        ),
+      }));
+    }
   };
 
-  const handleSaveDestructors = (destructors: { driverId1: string; driverId2: string }) => {
-    setData((prev) => ({
-      ...prev,
-      predictions: prev.predictions.map((p) =>
-        p.userId === currentUserId ? { ...p, destructors } : p
-      ),
-    }));
+  const handleSaveDestructors = async (destructors: { driverId1: string; driverId2: string }) => {
+    if (onSavePrediction) {
+      await onSavePrediction("destructors", destructors);
+    } else {
+      setData((prev) => ({
+        ...prev,
+        predictions: prev.predictions.map((p) =>
+          p.userId === currentUserId ? { ...p, destructors } : p
+        ),
+      }));
+    }
   };
 
-  const handleSaveMrSaturday = (mrSaturday: { driverId1: string; driverId2: string }) => {
-    setData((prev) => ({
-      ...prev,
-      predictions: prev.predictions.map((p) =>
-        p.userId === currentUserId ? { ...p, mrSaturday } : p
-      ),
-    }));
+  const handleSaveMrSaturday = async (mrSaturday: { driverId1: string; driverId2: string }) => {
+    if (onSavePrediction) {
+      await onSavePrediction("mrSaturday", mrSaturday);
+    } else {
+      setData((prev) => ({
+        ...prev,
+        predictions: prev.predictions.map((p) =>
+          p.userId === currentUserId ? { ...p, mrSaturday } : p
+        ),
+      }));
+    }
   };
 
-  const handleSaveZeroPointers = (zeroPointers: { driverIds: string[] }) => {
-    setData((prev) => ({
-      ...prev,
-      predictions: prev.predictions.map((p) =>
-        p.userId === currentUserId ? { ...p, zeroPointers } : p
-      ),
-    }));
+  const handleSaveZeroPointers = async (zeroPointers: { driverIds: string[] }) => {
+    if (onSavePrediction) {
+      await onSavePrediction("zeroPointers", zeroPointers);
+    } else {
+      setData((prev) => ({
+        ...prev,
+        predictions: prev.predictions.map((p) =>
+          p.userId === currentUserId ? { ...p, zeroPointers } : p
+        ),
+      }));
+    }
   };
 
-  const handleSaveWildcard = (wildcard: WildcardPrediction) => {
-    setData((prev) => ({
-      ...prev,
-      predictions: prev.predictions.map((p) =>
-        p.userId === currentUserId ? { ...p, wildcard } : p
-      ),
-    }));
+  const handleSaveWildcard = async (wildcard: WildcardPrediction) => {
+    if (onSavePrediction) {
+      await onSavePrediction("wildcard", wildcard);
+    } else {
+      setData((prev) => ({
+        ...prev,
+        predictions: prev.predictions.map((p) =>
+          p.userId === currentUserId ? { ...p, wildcard } : p
+        ),
+      }));
+    }
   };
 
-  const handleAdminSetWildcard = (
+  const handleAdminSetWildcard = async (
     userId: string,
     updates: { pointsPotential?: number; fulfilled?: boolean }
   ) => {
+    if (getApiBaseUrl()) {
+      try {
+        if (updates.pointsPotential != null) {
+          const points = Math.max(100, Math.min(200, updates.pointsPotential));
+          await putAdminWildcardPointsFromApi(group.id, userId, points);
+        }
+        if (updates.fulfilled !== undefined) {
+          await putAdminWildcardFulfilledFromApi(group.id, userId, updates.fulfilled);
+        }
+      } catch (err) {
+        message.error(err instanceof Error ? err.message : "Failed to update wildcard");
+        return;
+      }
+    }
     setData((prev) => ({
       ...prev,
       predictions: prev.predictions.map((p) => {
@@ -239,8 +308,6 @@ export function CategoryDetailView({ group, categoryId, data, setData, currentUs
       }),
     }));
   };
-
-  const isAdmin = isGroupAdmin(group, currentUserId);
 
   return (
     <div className="min-w-0 space-y-6">
@@ -377,9 +444,9 @@ export function CategoryDetailView({ group, categoryId, data, setData, currentUs
                         <label className="flex items-center gap-2 text-sm text-f1-silver">
                           <span>Points potential:</span>
                           <InputNumber
-                            min={1}
-                            max={100}
-                            value={w.pointsPotential ?? 10}
+                            min={100}
+                            max={200}
+                            value={w.pointsPotential ?? 100}
                             onChange={(val) => handleAdminSetWildcard(userPrediction.userId, { pointsPotential: val ?? undefined })}
                             className="w-20 bg-f1-gray border-f1-gray text-f1-silver [&_.ant-input-number-input]:bg-transparent"
                           />

@@ -27,13 +27,13 @@ export function ZeroPointersEditor({ value, onSave }: ZeroPointersEditorProps) {
       <div className="min-w-48">
         <label className="mb-1 block text-xs text-f1-silver/70">Drivers (0–{maxDriverCount})</label>
         <Select
-          mode="multiple"
           placeholder="Select drivers"
+          mode="multiple"
           value={driverIds}
           onChange={(ids) => setDriverIds(ids.slice(0, maxDriverCount))}
           options={driverOptions}
           className="w-full [&_.ant-select-selector]:bg-f1-gray [&_.ant-select-selector]:border-f1-gray [&_.ant-select-selection-item]:text-f1-silver f1-driver-select"
-          popupClassName="f1-driver-select-dropdown"
+          classNames={{ popup: { root: "f1-driver-select-dropdown" } }}
           maxTagCount="responsive"
           showSearch
           filterOption={(input, option) =>

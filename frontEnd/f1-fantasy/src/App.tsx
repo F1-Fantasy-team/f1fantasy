@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useAuth } from "@clerk/clerk-react";
-import { ConfigProvider } from "antd";
+import { App as AntdApp, ConfigProvider } from "antd";
 import { RecoilRoot } from "recoil";
 import { setAuthTokenGetter } from "./api/client";
 import Index from "./pages/Index.tsx";
@@ -34,9 +34,11 @@ function App() {
         <>
             <ApiAuthSetup />
             <ConfigProvider theme={f1Theme}>
-                <RecoilRoot>
-                    <Index />
-                </RecoilRoot>
+                <AntdApp>
+                    <RecoilRoot>
+                        <Index />
+                    </RecoilRoot>
+                </AntdApp>
             </ConfigProvider>
         </>
     );

@@ -1,6 +1,9 @@
-import { LockOutlined, UnlockOutlined } from "@ant-design/icons";
-import { useSetRecoilState } from "recoil";
+import { LockOutlined, UnlockOutlined, DeleteOutlined, LogoutOutlined, EditOutlined } from "@ant-design/icons";
+import { useState } from "react";
+import { App, Input, Modal } from "antd";
+import { useSetRecoilState, useRecoilValue } from "recoil";
 import { BackLink, InviteSection } from "../molecules";
+import { firstRaceDateState } from "../state/atoms";
 import { StandingsTable } from "../molecules/StandingsTable";
 import { RenderYourPredictions } from "../molecules/YourPredictionContent";
 import { F1Title, F1Text, F1Button } from "../atoms";
@@ -21,6 +24,9 @@ type GroupPredictionsViewProps = {
   setData: (data: GroupPredictionsData | ((prev: GroupPredictionsData) => GroupPredictionsData)) => void;
   currentUserId: string;
   currentUserDisplayName: string;
+  onDeleteGroup?: (groupId: string) => void;
+  onLeaveGroup?: (groupId: string) => void;
+  onRenameGroup?: (groupId: string, newName: string) => void;
 };
 
 export function GroupPredictionsView({
@@ -29,14 +35,21 @@ export function GroupPredictionsView({
   setData,
   currentUserId,
   currentUserDisplayName: _currentUserDisplayName,
+  onDeleteGroup,
+  onLeaveGroup,
+  onRenameGroup,
 }: GroupPredictionsViewProps) {
+  const { modal } = App.useApp();
+  const [renameModalOpen, setRenameModalOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
   const setSelectedCategoryId = useSetRecoilState(selectedCategoryIdState);
+  const firstRaceDateFromRaces = useRecoilValue(firstRaceDateState);
   const myStanding = data.standings.find((s) => s.userId === currentUserId);
   const myPredictions = data.predictions.find((p) => p.userId === currentUserId);
   const isAdmin = isGroupAdmin(group, currentUserId);
-  const isLocked = isUserLocked(group, data, currentUserId);
-  const groupLocked = getEffectiveGroupLocked(group, data);
-  const canUnlockSelf = canUserUnlockSelf(group, data, currentUserId);
+  const isLocked = isUserLocked(group, data, currentUserId, firstRaceDateFromRaces);
+  const groupLocked = getEffectiveGroupLocked(group, data, firstRaceDateFromRaces);
+  const canUnlockSelf = canUserUnlockSelf(group, data, currentUserId, firstRaceDateFromRaces);
   const mode = group.predictionLockMode ?? "hybrid";
 
   const handleLockSelf = () => {
@@ -67,6 +80,43 @@ export function GroupPredictionsView({
 
   const handleCategoryClick = (categoryId: PredictionCategoryId) => {
     setSelectedCategoryId(categoryId);
+  };
+
+  const handleDeleteGroupClick = () => {
+    if (!onDeleteGroup) return;
+    modal.confirm({
+      title: "Delete group?",
+      content: `"${group.name}" will be permanently deleted. All members will lose access. This cannot be undone.`,
+      okText: "Delete group",
+      okType: "danger",
+      cancelText: "Cancel",
+      onOk: () => onDeleteGroup(group.id),
+    });
+  };
+
+  const handleLeaveGroupClick = () => {
+    if (!onLeaveGroup) return;
+    modal.confirm({
+      title: "Leave group?",
+      content: `You will be removed from "${group.name}". You can rejoin later with the invite code.`,
+      okText: "Leave",
+      okType: "danger",
+      cancelText: "Cancel",
+      onOk: () => onLeaveGroup(group.id),
+    });
+  };
+
+  const openRenameModal = () => {
+    setRenameValue(group.name);
+    setRenameModalOpen(true);
+  };
+
+  const handleRenameSubmit = () => {
+    const trimmed = renameValue.trim();
+    if (!trimmed || !onRenameGroup) return;
+    onRenameGroup(group.id, trimmed);
+    setRenameModalOpen(false);
+    setRenameValue("");
   };
 
   const showAdminGroupToggle = isAdmin && mode === "admin";
@@ -143,7 +193,45 @@ export function GroupPredictionsView({
           </div>
         )}
         <InviteSection group={group} />
+        <div className="mt-4 flex flex-wrap gap-2 border-t border-f1-gray pt-4">
+          {isAdmin && onRenameGroup && (
+            <F1Button type="default" size="small" icon={<EditOutlined />} onClick={openRenameModal}>
+              Rename group
+            </F1Button>
+          )}
+          {isAdmin && onDeleteGroup && (
+            <F1Button type="default" danger size="small" icon={<DeleteOutlined />} onClick={handleDeleteGroupClick}>
+              Delete group
+            </F1Button>
+          )}
+          {onLeaveGroup && !isAdmin && (
+            <F1Button type="default" size="small" icon={<LogoutOutlined />} onClick={handleLeaveGroupClick}>
+              Leave group
+            </F1Button>
+          )}
+        </div>
       </div>
+
+      <Modal
+        title="Rename group"
+        open={renameModalOpen}
+        onOk={handleRenameSubmit}
+        onCancel={() => { setRenameModalOpen(false); setRenameValue(""); }}
+        okText="Save"
+        cancelText="Cancel"
+        okButtonProps={{ disabled: !renameValue.trim() }}
+        destroyOnHidden
+      >
+        <Input
+          placeholder="Group name"
+          value={renameValue}
+          onChange={(e) => setRenameValue(e.target.value)}
+          onPressEnter={handleRenameSubmit}
+          className="mt-3"
+          maxLength={100}
+          showCount
+        />
+      </Modal>
 
       <section>
         <F1Title level={5} className="!mb-2">

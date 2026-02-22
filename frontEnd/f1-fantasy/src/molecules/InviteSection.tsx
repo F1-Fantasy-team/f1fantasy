@@ -1,5 +1,5 @@
 import { CopyOutlined, LinkOutlined } from "@ant-design/icons";
-import { message } from "antd";
+import { App } from "antd";
 import { F1Button, F1Text } from "../atoms";
 import type { Group } from "../types/group";
 
@@ -13,6 +13,7 @@ function getInviteLink(inviteCode: string): string {
 }
 
 export function InviteSection({ group }: InviteSectionProps) {
+  const { message } = App.useApp();
   if (!group.inviteCode) return null;
 
   const inviteLink = getInviteLink(group.inviteCode);

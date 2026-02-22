@@ -5,8 +5,13 @@ import {
   selectedGroupIdState,
   userGroupsState,
   allGroupsState,
+  selectedCategoryIdState,
   driversState,
   constructorsState,
+  driversFromApiState,
+  constructorsFromApiState,
+  firstRaceDateState,
+  appDataLoadingState,
 } from "./atoms";
 import type { Group } from "../types/group";
 
@@ -48,6 +53,7 @@ describe("userGroupsState", () => {
         name: "Test",
         memberCount: 1,
         createdAt: "2025-01-01T00:00:00Z",
+        adminUserId: "admin-1",
       },
     ];
     const { result } = renderHook(() => useRecoilState(userGroupsState), {
@@ -70,28 +76,95 @@ describe("allGroupsState", () => {
   });
 });
 
+describe("selectedCategoryIdState", () => {
+  it("defaults to null", () => {
+    const { result } = renderHook(() => useRecoilValue(selectedCategoryIdState), {
+      wrapper,
+    });
+    expect(result.current).toBeNull();
+  });
+
+  it("can be set", () => {
+    const { result } = renderHook(() => useRecoilState(selectedCategoryIdState), {
+      wrapper,
+    });
+    act(() => {
+      result.current[1]("driversChampionship");
+    });
+    expect(result.current[0]).toBe("driversChampionship");
+  });
+});
+
 describe("driversState", () => {
-  it("defaults to drivers list (empty when no mock data in repo)", () => {
+  it("defaults to empty array", () => {
     const { result } = renderHook(() => useRecoilValue(driversState), {
       wrapper,
     });
-    expect(Array.isArray(result.current)).toBe(true);
-    result.current.forEach((d) => {
-      expect(d).toHaveProperty("id");
-      expect(d).toHaveProperty("name");
-    });
+    expect(result.current).toEqual([]);
   });
 });
 
 describe("constructorsState", () => {
-  it("defaults to constructors list (empty when no mock data in repo)", () => {
+  it("defaults to empty array", () => {
     const { result } = renderHook(() => useRecoilValue(constructorsState), {
       wrapper,
     });
-    expect(Array.isArray(result.current)).toBe(true);
-    result.current.forEach((c) => {
-      expect(c).toHaveProperty("id");
-      expect(c).toHaveProperty("name");
+    expect(result.current).toEqual([]);
+  });
+});
+
+describe("driversFromApiState", () => {
+  it("defaults to false", () => {
+    const { result } = renderHook(() => useRecoilValue(driversFromApiState), {
+      wrapper,
     });
+    expect(result.current).toBe(false);
+  });
+});
+
+describe("constructorsFromApiState", () => {
+  it("defaults to false", () => {
+    const { result } = renderHook(() => useRecoilValue(constructorsFromApiState), {
+      wrapper,
+    });
+    expect(result.current).toBe(false);
+  });
+});
+
+describe("firstRaceDateState", () => {
+  it("defaults to null", () => {
+    const { result } = renderHook(() => useRecoilValue(firstRaceDateState), {
+      wrapper,
+    });
+    expect(result.current).toBeNull();
+  });
+
+  it("can be set to an ISO date string", () => {
+    const { result } = renderHook(() => useRecoilState(firstRaceDateState), {
+      wrapper,
+    });
+    act(() => {
+      result.current[1]("2026-03-01");
+    });
+    expect(result.current[0]).toBe("2026-03-01");
+  });
+});
+
+describe("appDataLoadingState", () => {
+  it("defaults to false", () => {
+    const { result } = renderHook(() => useRecoilValue(appDataLoadingState), {
+      wrapper,
+    });
+    expect(result.current).toBe(false);
+  });
+
+  it("can be set to true", () => {
+    const { result } = renderHook(() => useRecoilState(appDataLoadingState), {
+      wrapper,
+    });
+    act(() => {
+      result.current[1](true);
+    });
+    expect(result.current[0]).toBe(true);
   });
 });
