@@ -69,6 +69,35 @@ public class DriverRepository
         }
     }
 
+    public async Task<IEnumerable<Driver>> GetActiveDriversAsync(string? season = null)
+    {
+        try
+        {
+            // Use current year if season not specified
+            season ??= DateTime.UtcNow.Year.ToString();
+            
+            // Get drivers that have standings in the current season
+            var activeDriverIds = await _context.DriverStandings
+                .Where(ds => ds.Season == season)
+                .Select(ds => ds.DriverId)
+                .Distinct()
+                .ToListAsync();
+            
+            var activeDrivers = await _context.Drivers
+                .Where(d => activeDriverIds.Contains(d.DriverId))
+                .OrderBy(d => d.FamilyName)
+                .ToListAsync();
+            
+            _logger.LogDebug("Retrieved {Count} active drivers for season {Season}", activeDrivers.Count, season);
+            return activeDrivers;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving active drivers for season {Season}", season);
+            throw;
+        }
+    }
+
     public async Task ClearAsync()
     {
         try
