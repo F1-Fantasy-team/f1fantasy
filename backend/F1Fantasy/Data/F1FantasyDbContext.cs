@@ -19,6 +19,9 @@ public class F1FantasyDbContext : DbContext
     public DbSet<Qualifying> Qualifyings { get; set; }
     public DbSet<PitStop> PitStops { get; set; }
     public DbSet<LapTiming> LapTimings { get; set; }
+    public DbSet<DriverStanding> DriverStandings { get; set; }
+    public DbSet<ConstructorStanding> ConstructorStandings { get; set; }
+    public DbSet<Status> Statuses { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -134,6 +137,7 @@ public class F1FantasyDbContext : DbContext
             entity.Property(r => r.Grid).HasMaxLength(10);
             entity.Property(r => r.Laps).HasMaxLength(10);
             entity.Property(r => r.Status).HasMaxLength(100);
+            entity.Property(r => r.StatusId).HasMaxLength(10); // Foreign key to Status table
             entity.Property(r => r.IsSprint).IsRequired().HasDefaultValue(false);
             
             // Index for common queries
@@ -141,6 +145,7 @@ public class F1FantasyDbContext : DbContext
             entity.HasIndex(r => new { r.Season, r.Round, r.IsSprint });
             entity.HasIndex(r => r.DriverId);
             entity.HasIndex(r => r.ConstructorId);
+            entity.HasIndex(r => r.StatusId); // Index for status lookups
             
             // Ignore navigation properties - we don't want to load full driver/constructor objects
             entity.Ignore(r => r.Driver);
@@ -229,6 +234,60 @@ public class F1FantasyDbContext : DbContext
             entity.HasIndex(l => new { l.Season, l.Round, l.LapNumber });
             entity.HasIndex(l => new { l.Season, l.Round, l.DriverId });
             entity.HasIndex(l => l.DriverId);
+        });
+
+        // DriverStanding configuration
+        modelBuilder.Entity<DriverStanding>(entity =>
+        {
+            entity.HasKey(ds => new { ds.Season, ds.DriverId });
+            entity.Property(ds => ds.Season).HasMaxLength(10);
+            entity.Property(ds => ds.DriverId).HasMaxLength(100);
+            entity.Property(ds => ds.Round).HasMaxLength(10).IsRequired();
+            entity.Property(ds => ds.Position).HasMaxLength(10).IsRequired();
+            entity.Property(ds => ds.PositionText).HasMaxLength(10).IsRequired();
+            entity.Property(ds => ds.Points).HasMaxLength(10).IsRequired();
+            entity.Property(ds => ds.Wins).HasMaxLength(10).IsRequired();
+            entity.Property(ds => ds.ConstructorId).HasMaxLength(100).IsRequired();
+            
+            // Index for common queries
+            entity.HasIndex(ds => ds.Season);
+            entity.HasIndex(ds => ds.DriverId);
+            
+            // Ignore navigation properties
+            entity.Ignore(ds => ds.Driver);
+            entity.Ignore(ds => ds.Constructor);
+        });
+
+        // ConstructorStanding configuration
+        modelBuilder.Entity<ConstructorStanding>(entity =>
+        {
+            entity.HasKey(cs => new { cs.Season, cs.ConstructorId });
+            entity.Property(cs => cs.Season).HasMaxLength(10);
+            entity.Property(cs => cs.ConstructorId).HasMaxLength(100);
+            entity.Property(cs => cs.Round).HasMaxLength(10).IsRequired();
+            entity.Property(cs => cs.Position).HasMaxLength(10).IsRequired();
+            entity.Property(cs => cs.PositionText).HasMaxLength(10).IsRequired();
+            entity.Property(cs => cs.Points).HasMaxLength(10).IsRequired();
+            entity.Property(cs => cs.Wins).HasMaxLength(10).IsRequired();
+            
+            // Index for common queries
+            entity.HasIndex(cs => cs.Season);
+            entity.HasIndex(cs => cs.ConstructorId);
+            
+            // Ignore navigation property
+            entity.Ignore(cs => cs.Constructor);
+        });
+
+        // Status configuration
+        modelBuilder.Entity<Status>(entity =>
+        {
+            entity.HasKey(s => s.StatusId);
+            entity.Property(s => s.StatusId).HasMaxLength(10);
+            entity.Property(s => s.StatusText).HasMaxLength(100).IsRequired();
+            entity.Property(s => s.Count).HasMaxLength(10).IsRequired();
+            
+            // Index for text lookups
+            entity.HasIndex(s => s.StatusText);
         });
     }
 }

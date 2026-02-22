@@ -75,6 +75,12 @@ builder.Services.AddScoped<F1Fantasy.Repository.PitStopRepository>();
 builder.Services.AddScoped<F1Fantasy.Services.PitStopService>();
 builder.Services.AddScoped<F1Fantasy.Repository.LapTimingRepository>();
 builder.Services.AddScoped<F1Fantasy.Services.LapTimingService>();
+builder.Services.AddScoped<F1Fantasy.Repository.DriverStandingRepository>();
+builder.Services.AddScoped<F1Fantasy.Services.DriverStandingService>();
+builder.Services.AddScoped<F1Fantasy.Repository.ConstructorStandingRepository>();
+builder.Services.AddScoped<F1Fantasy.Services.ConstructorStandingService>();
+builder.Services.AddScoped<F1Fantasy.Repository.StatusRepository>();
+builder.Services.AddScoped<F1Fantasy.Services.StatusService>();
 
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
