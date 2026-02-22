@@ -76,15 +76,9 @@ public class DriverRepository
             // Use current year if season not specified
             season ??= DateTime.UtcNow.Year.ToString();
             
-            // Get drivers that have standings in the current season
-            var activeDriverIds = await _context.DriverStandings
-                .Where(ds => ds.Season == season)
-                .Select(ds => ds.DriverId)
-                .Distinct()
-                .ToListAsync();
-            
+            // Get drivers that have the season in their ActiveSeasons list
             var activeDrivers = await _context.Drivers
-                .Where(d => activeDriverIds.Contains(d.DriverId))
+                .Where(d => d.ActiveSeasons.Contains(season))
                 .OrderBy(d => d.FamilyName)
                 .ToListAsync();
             

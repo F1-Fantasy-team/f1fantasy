@@ -44,15 +44,9 @@ public class ConstructorRepository
         // Use current year if season not specified
         season ??= DateTime.UtcNow.Year.ToString();
         
-        // Get constructors that have standings in the current season
-        var activeConstructorIds = await _context.ConstructorStandings
-            .Where(cs => cs.Season == season)
-            .Select(cs => cs.ConstructorId)
-            .Distinct()
-            .ToListAsync();
-        
+        // Get constructors that have the season in their ActiveSeasons list
         return await _context.Constructors
-            .Where(c => activeConstructorIds.Contains(c.ConstructorId))
+            .Where(c => c.ActiveSeasons.Contains(season))
             .OrderBy(c => c.Name)
             .ToListAsync();
     }

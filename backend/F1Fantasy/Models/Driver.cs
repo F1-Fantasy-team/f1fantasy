@@ -10,6 +10,7 @@ public class Driver
     public string FamilyName { get; set; } = string.Empty;
     public string DateOfBirth { get; set; } = string.Empty;
     public string Nationality { get; set; } = string.Empty;
+    public List<string> ActiveSeasons { get; set; } = new List<string>();
 }
 
 // API Response models for Drivers endpoint
