@@ -1,0 +1,118 @@
+using F1Fantasy.Data;
+using F1Fantasy.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace F1Fantasy.Repository;
+
+public class GroupRepository
+{
+    private readonly F1FantasyDbContext _context;
+
+    public GroupRepository(F1FantasyDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<Group?> GetByIdAsync(int id)
+    {
+        return await _context.Groups
+            .Include(g => g.Members)
+            .FirstOrDefaultAsync(g => g.Id == id);
+    }
+
+    public async Task<Group?> GetByInviteCodeAsync(string inviteCode)
+    {
+        return await _context.Groups
+            .Include(g => g.Members)
+            .FirstOrDefaultAsync(g => g.InviteCode == inviteCode);
+    }
+
+    public async Task<List<Group>> GetAllGroupsAsync()
+    {
+        return await _context.Groups
+            .Include(g => g.Members)
+            .ToListAsync();
+    }
+
+    public async Task<List<Group>> GetGroupsByUserIdAsync(string userId)
+    {
+        return await _context.GroupMembers
+            .Where(gm => gm.UserId == userId)
+            .Select(gm => gm.Group)
+            .Include(g => g.Members)
+            .ToListAsync();
+    }
+
+    public async Task<Group> CreateAsync(Group group)
+    {
+        _context.Groups.Add(group);
+        await _context.SaveChangesAsync();
+        return group;
+    }
+
+    public async Task<Group> UpdateAsync(Group group)
+    {
+        _context.Groups.Update(group);
+        await _context.SaveChangesAsync();
+        return group;
+    }
+
+    public async Task DeleteAsync(int id)
+    {
+        var group = await _context.Groups.FindAsync(id);
+        if (group != null)
+        {
+            _context.Groups.Remove(group);
+            await _context.SaveChangesAsync();
+        }
+    }
+
+    public async Task<bool> IsUserMemberAsync(int groupId, string userId)
+    {
+        return await _context.GroupMembers
+            .AnyAsync(gm => gm.GroupId == groupId && gm.UserId == userId);
+    }
+
+    public async Task<bool> IsUserAdminAsync(int groupId, string userId)
+    {
+        var group = await _context.Groups.FindAsync(groupId);
+        return group?.AdminUserId == userId;
+    }
+
+    public async Task<GroupMember> AddMemberAsync(GroupMember member)
+    {
+        _context.GroupMembers.Add(member);
+        await _context.SaveChangesAsync();
+        return member;
+    }
+
+    public async Task RemoveMemberAsync(int groupId, string userId)
+    {
+        var member = await _context.GroupMembers
+            .FirstOrDefaultAsync(gm => gm.GroupId == groupId && gm.UserId == userId);
+        
+        if (member != null)
+        {
+            _context.GroupMembers.Remove(member);
+            await _context.SaveChangesAsync();
+        }
+    }
+
+    public async Task<List<GroupMember>> GetMembersAsync(int groupId)
+    {
+        return await _context.GroupMembers
+            .Where(gm => gm.GroupId == groupId)
+            .ToListAsync();
+    }
+
+    public async Task SetPredictionsLockedAsync(int groupId, bool isLocked)
+    {
+        var group = await _context.Groups.FindAsync(groupId);
+        if (group != null)
+        {
+            group.PredictionsLocked = isLocked;
+            group.LockedAt = isLocked ? DateTime.UtcNow : null;
+            await _context.SaveChangesAsync();
+        }
+    }
+}

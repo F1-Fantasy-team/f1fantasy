@@ -51,17 +51,24 @@ public class ConstructorStandingRepository
     public async Task<List<ConstructorStanding>> GetBySeasonAsync(string season)
     {
         // Get the latest round for this season
-        var maxRound = await _context.ConstructorStandings
+        // Can't use int.Parse in LINQ, so fetch distinct rounds and parse in memory
+        var rounds = await _context.ConstructorStandings
             .Where(cs => cs.Season == season)
-            .MaxAsync(cs => (int?)int.Parse(cs.Round));
+            .Select(cs => cs.Round)
+            .Distinct()
+            .ToListAsync();
 
-        if (maxRound == null)
+        if (!rounds.Any())
             return new List<ConstructorStanding>();
 
-        return await _context.ConstructorStandings
+        var maxRound = rounds.Max(r => int.Parse(r));
+
+        var standings = await _context.ConstructorStandings
             .Where(cs => cs.Season == season && cs.Round == maxRound.ToString())
-            .OrderBy(cs => int.Parse(cs.Position))
             .ToListAsync();
+
+        // Sort in memory since int.Parse can't be translated to SQL
+        return standings.OrderBy(cs => int.Parse(cs.Position)).ToList();
     }
 
     public async Task<ConstructorStanding?> GetByConstructorAsync(string season, string round, string constructorId)

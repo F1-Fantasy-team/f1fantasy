@@ -27,7 +27,8 @@ public class ResultService
         
         try
         {
-            var content = await _apiHttpClient.GetStringWithRetryAsync($"{ApiBaseUrl}/{season}/results/");
+            // Use limit=1000 to ensure we get all races in the season (typical F1 season has 20-24 races)
+            var content = await _apiHttpClient.GetStringWithRetryAsync($"{ApiBaseUrl}/{season}/results.json?limit=1000");
             var apiResponse = JsonSerializer.Deserialize<ResultApiResponse>(content, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
@@ -292,6 +293,16 @@ public class ResultService
     private async Task<IEnumerable<RaceWithResults>> BuildRaceWithResultsFromCache(string season)
     {
         var cachedResults = await _resultRepository.GetBySeasonAsync(season);
+        
+        // Populate Driver and Constructor navigation properties from IDs
+        foreach (var r in cachedResults)
+        {
+            if (!string.IsNullOrEmpty(r.DriverId))
+                r.Driver = new Driver { DriverId = r.DriverId };
+            if (!string.IsNullOrEmpty(r.ConstructorId))
+                r.Constructor = new Constructor { ConstructorId = r.ConstructorId };
+        }
+        
         var groupedByRace = cachedResults.GroupBy(r => new { r.Season, r.Round });
 
         return groupedByRace.Select(g => new RaceWithResults
@@ -313,5 +324,46 @@ public class ResultService
             Round = g.Key.Round,
             SprintResults = g.ToList()
         }).ToList();
+    }
+
+    public async Task<int?> GetLatestRoundWithResultsAsync(string season)
+    {
+        _logger.LogDebug("Getting latest round with results for season {Season}", season);
+        
+        // First check cache
+        var cachedLatest = await _resultRepository.GetLatestRoundWithResultsAsync(season);
+        
+        // Only fetch from API if no cache or to potentially get newer data
+        try
+        {
+            await GetResultsBySeasonAsync(season);
+            // Check again after API fetch
+            return await _resultRepository.GetLatestRoundWithResultsAsync(season);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to fetch latest results from API for season {Season}, using cached data", season);
+            return cachedLatest;
+        }
+    }
+
+    /// <summary>
+    /// Get results from cache first, only fetch from API if not cached
+    /// </summary>
+    public async Task<IEnumerable<RaceWithResults>?> GetResultsBySeasonCachedAsync(string season)
+    {
+        _logger.LogDebug("Attempting to get results for season {Season} from cache first", season);
+        
+        // Check cache first
+        var cached = await BuildRaceWithResultsFromCache(season);
+        if (cached.Any())
+        {
+            _logger.LogInformation("Using {Count} cached race results for season {Season}", cached.Count(), season);
+            return cached;
+        }
+        
+        // Cache miss - fetch from API
+        _logger.LogInformation("No cached results for season {Season}, fetching from API", season);
+        return await GetResultsBySeasonAsync(season);
     }
 }
