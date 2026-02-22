@@ -58,13 +58,13 @@ public class PredictionService
             ValidationExtensions.ValidateId(id, "Constructor ID");
         }
 
-        // Validate: Must have all constructors, no duplicates
-        var allConstructors = await _constructorRepository.GetAllAsync();
-        var constructorIds = allConstructors.Select(c => c.ConstructorId).ToList();
+        // Validate: Must have all active constructors for current season, no duplicates
+        var activeConstructors = await _constructorRepository.GetActiveConstructorsAsync();
+        var constructorIds = activeConstructors.Select(c => c.ConstructorId).ToList();
 
         if (rankedConstructorIds.Count != constructorIds.Count)
         {
-            throw new ArgumentException($"Must rank all {constructorIds.Count} constructors");
+            throw new ArgumentException($"Must rank all {constructorIds.Count} active constructors");
         }
 
         if (rankedConstructorIds.Distinct().Count() != rankedConstructorIds.Count)
@@ -108,13 +108,14 @@ public class PredictionService
             ValidationExtensions.ValidateId(id, "Driver ID");
         }
 
-        // Validate: Must have all active drivers (20-22), no duplicates
-        var allDrivers = await _driverRepository.GetAllAsync();
-        var driverIds = allDrivers.Select(d => d.DriverId).ToList();
+        // Validate: Must have all active drivers (typically 20), no duplicates
+        var activeDrivers = await _driverRepository.GetActiveDriversAsync();
+        var driverIds = activeDrivers.Select(d => d.DriverId).ToList();
+        var expectedCount = driverIds.Count;
 
-        if (rankedDriverIds.Count < 20 || rankedDriverIds.Count > 22)
+        if (rankedDriverIds.Count != expectedCount)
         {
-            throw new ArgumentException($"Must rank between 20-22 drivers (found {rankedDriverIds.Count})");
+            throw new ArgumentException($"Must rank all {expectedCount} active drivers (found {rankedDriverIds.Count})");
         }
 
         if (rankedDriverIds.Distinct().Count() != rankedDriverIds.Count)
@@ -154,17 +155,17 @@ public class PredictionService
             throw new ArgumentException("Cannot select the same driver twice");
         }
 
-        var allDrivers = await _driverRepository.GetAllAsync();
-        var driverIds = allDrivers.Select(d => d.DriverId).ToList();
+        var activeDrivers = await _driverRepository.GetActiveDriversAsync();
+        var driverIds = activeDrivers.Select(d => d.DriverId).ToList();
 
         if (driver1Id != null && !driverIds.Contains(driver1Id))
         {
-            throw new ArgumentException("Invalid driver1 ID");
+            throw new ArgumentException("Invalid driver1 ID - driver not active in current season");
         }
 
         if (driver2Id != null && !driverIds.Contains(driver2Id))
         {
-            throw new ArgumentException("Invalid driver2 ID");
+            throw new ArgumentException("Invalid driver2 ID - driver not active in current season");
         }
 
         var prediction = new DriverDraftPrediction
@@ -194,17 +195,17 @@ public class PredictionService
             throw new ArgumentException("Cannot select the same driver twice");
         }
 
-        var allDrivers = await _driverRepository.GetAllAsync();
-        var driverIds = allDrivers.Select(d => d.DriverId).ToList();
+        var activeDrivers = await _driverRepository.GetActiveDriversAsync();
+        var driverIds = activeDrivers.Select(d => d.DriverId).ToList();
 
         if (driver1Id != null && !driverIds.Contains(driver1Id))
         {
-            throw new ArgumentException("Invalid driver1 ID");
+            throw new ArgumentException("Invalid driver1 ID - driver not active in current season");
         }
 
         if (driver2Id != null && !driverIds.Contains(driver2Id))
         {
-            throw new ArgumentException("Invalid driver2 ID");
+            throw new ArgumentException("Invalid driver2 ID - driver not active in current season");
         }
 
         var prediction = new DestructorPrediction
@@ -234,17 +235,17 @@ public class PredictionService
             throw new ArgumentException("Cannot select the same driver twice");
         }
 
-        var allDrivers = await _driverRepository.GetAllAsync();
-        var driverIds = allDrivers.Select(d => d.DriverId).ToList();
+        var activeDrivers = await _driverRepository.GetActiveDriversAsync();
+        var driverIds = activeDrivers.Select(d => d.DriverId).ToList();
 
         if (driver1Id != null && !driverIds.Contains(driver1Id))
         {
-            throw new ArgumentException("Invalid driver1 ID");
+            throw new ArgumentException("Invalid driver1 ID - driver not active in current season");
         }
 
         if (driver2Id != null && !driverIds.Contains(driver2Id))
         {
-            throw new ArgumentException("Invalid driver2 ID");
+            throw new ArgumentException("Invalid driver2 ID - driver not active in current season");
         }
 
         var prediction = new MrSaturdayPrediction
@@ -275,15 +276,15 @@ public class PredictionService
             throw new ArgumentException("Cannot select the same driver multiple times");
         }
 
-        // Validate all driver IDs exist
-        var allDrivers = await _driverRepository.GetAllAsync();
-        var validDriverIds = allDrivers.Select(d => d.DriverId).ToList();
+        // Validate all driver IDs exist and are active in current season
+        var activeDrivers = await _driverRepository.GetActiveDriversAsync();
+        var validDriverIds = activeDrivers.Select(d => d.DriverId).ToList();
 
         foreach (var driverId in driverIds)
         {
             if (!validDriverIds.Contains(driverId))
             {
-                throw new ArgumentException($"Invalid driver ID: {driverId}");
+                throw new ArgumentException($"Invalid driver ID: {driverId} - driver not active in current season");
             }
         }
 

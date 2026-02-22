@@ -39,6 +39,24 @@ public class ConstructorRepository
         return await _context.Constructors.OrderBy(c => c.Name).ToListAsync();
     }
 
+    public async Task<IEnumerable<Constructor>> GetActiveConstructorsAsync(string? season = null)
+    {
+        // Use current year if season not specified
+        season ??= DateTime.UtcNow.Year.ToString();
+        
+        // Get constructors that have standings in the current season
+        var activeConstructorIds = await _context.ConstructorStandings
+            .Where(cs => cs.Season == season)
+            .Select(cs => cs.ConstructorId)
+            .Distinct()
+            .ToListAsync();
+        
+        return await _context.Constructors
+            .Where(c => activeConstructorIds.Contains(c.ConstructorId))
+            .OrderBy(c => c.Name)
+            .ToListAsync();
+    }
+
     public async Task ClearAsync()
     {
         _context.Constructors.RemoveRange(_context.Constructors);
