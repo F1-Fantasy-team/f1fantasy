@@ -1,9 +1,11 @@
 using F1Fantasy.Models;
 using F1Fantasy.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace F1Fantasy.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class ConstructorStandingController : ControllerBase

@@ -1,7 +1,11 @@
 using DotNetEnv;
 using F1Fantasy.Data;
 using F1Fantasy.Middleware;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.Security.Claims;
+using System.Text;
 
 // Load environment variables from .env file in development
 if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development" || 
@@ -82,6 +86,50 @@ builder.Services.AddScoped<F1Fantasy.Services.ConstructorStandingService>();
 builder.Services.AddScoped<F1Fantasy.Repository.StatusRepository>();
 builder.Services.AddScoped<F1Fantasy.Services.StatusService>();
 
+// Configure Clerk JWT Authentication
+var clerkSecretKey = Environment.GetEnvironmentVariable("CLERK_SECRET_KEY");
+if (string.IsNullOrEmpty(clerkSecretKey))
+{
+    throw new InvalidOperationException("CLERK_SECRET_KEY environment variable is not set. Please configure it in .env file.");
+}
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.Authority = "https://clerk.com";
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = false, // Clerk doesn't use audience validation by default
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = "https://clerk.com",
+            ClockSkew = TimeSpan.FromMinutes(5)
+        };
+        
+        // Configure Clerk's JWKS endpoint for key validation
+        options.MetadataAddress = "https://clerk.com/.well-known/jwks.json";
+        
+        options.Events = new JwtBearerEvents
+        {
+            OnAuthenticationFailed = context =>
+            {
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                logger.LogError(context.Exception, "Authentication failed: {Message}", context.Exception.Message);
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
+            {
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                var userId = context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                logger.LogInformation("Token validated successfully for user: {UserId}", userId);
+                return Task.CompletedTask;
+            }
+        };
+    });
+
+builder.Services.AddAuthorization();
+
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -124,6 +172,8 @@ if (app.Environment.IsDevelopment())
 // Enable CORS - must be before UseAuthorization
 app.UseCors("AllowFrontend");
 
+// Enable authentication and authorization
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
