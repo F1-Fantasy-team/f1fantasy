@@ -108,7 +108,7 @@ public static class ValidationExtensions
     /// </summary>
     public static void ValidateLockMode(string lockMode)
     {
-        var validModes = new[] { "manual", "auto", "never" };
+        var validModes = new[] { "admin", "system", "hybrid" };
         if (!validModes.Contains(lockMode.ToLower()))
         {
             throw new ArgumentException($"Lock mode must be one of: {string.Join(", ", validModes)}");

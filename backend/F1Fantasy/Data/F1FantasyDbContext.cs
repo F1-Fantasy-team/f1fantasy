@@ -23,6 +23,9 @@ public class F1FantasyDbContext : DbContext
     public DbSet<DriverStanding> DriverStandings { get; set; }
     public DbSet<ConstructorStanding> ConstructorStandings { get; set; }
     public DbSet<Status> Statuses { get; set; }
+    
+    // Metadata DbSets
+    public DbSet<DataFetchMetadata> DataFetchMetadata { get; set; }
 
     // Fantasy League DbSets
     public DbSet<Group> Groups { get; set; }
@@ -469,6 +472,17 @@ public class F1FantasyDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(s => s.GroupId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // DataFetchMetadata configuration
+        modelBuilder.Entity<DataFetchMetadata>(entity =>
+        {
+            entity.HasKey(d => d.Id);
+            entity.Property(d => d.Season).HasMaxLength(10).IsRequired();
+            entity.Property(d => d.DataType).HasMaxLength(50).IsRequired();
+            entity.Property(d => d.ErrorMessage).HasMaxLength(500);
+            
+            entity.HasIndex(d => new { d.Season, d.DataType }).IsUnique();
         });
     }
 }

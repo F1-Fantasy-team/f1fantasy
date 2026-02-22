@@ -101,6 +101,7 @@ builder.Services.AddDbContext<F1FantasyDbContext>(options =>
 // Add services to the container.
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<F1Fantasy.Services.PaginationStateTracker>();
+builder.Services.AddScoped<F1Fantasy.Repository.DataFetchMetadataRepository>();
 builder.Services.AddScoped<F1Fantasy.Repository.RaceRepository>();
 builder.Services.AddScoped<F1Fantasy.Services.RaceService>();
 builder.Services.AddScoped<F1Fantasy.Repository.SeasonRepository>();
