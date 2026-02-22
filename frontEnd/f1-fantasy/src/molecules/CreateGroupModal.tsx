@@ -1,15 +1,77 @@
 import { Modal, Form, Input } from "antd";
 import { F1Button, F1Title } from "../atoms";
 import type { Group } from "../types/group";
+import type { PredictionLockMode } from "../types/group";
 
 type CreateGroupModalProps = {
   open: boolean;
   onClose: () => void;
   onCreated: (group: Group) => void;
+  /** Current user ID; set as group admin. */
+  currentUserId: string;
 };
 
-export function CreateGroupModal({ open, onClose, onCreated }: CreateGroupModalProps) {
-  const [form] = Form.useForm<{ name: string }>();
+const LOCK_MODE_OPTIONS: { value: PredictionLockMode; label: string; description: string }[] = [
+  {
+    value: "hybrid",
+    label: "System + admin override",
+    description: "System locks at season start; you can override lock/unlock anytime (default).",
+  },
+  {
+    value: "admin",
+    label: "Admin only",
+    description: "You decide when predictions are locked or unlocked.",
+  },
+  {
+    value: "system",
+    label: "System only",
+    description: "Lock is based on season start date from the backend; no manual override.",
+  },
+];
+
+function LockModeCards({
+  value,
+  onChange,
+}: {
+  value?: PredictionLockMode;
+  onChange?: (v: PredictionLockMode) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      {LOCK_MODE_OPTIONS.map((opt) => {
+        const selected = value === opt.value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange?.(opt.value)}
+            className={`flex w-full cursor-pointer items-start gap-4 rounded-xl border-2 p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-f1-red/50 focus:ring-offset-2 focus:ring-offset-f1-carbon ${
+              selected
+                ? "border-f1-red bg-f1-red/10"
+                : "border-f1-gray bg-f1-gray/40 hover:border-f1-silver/50 hover:bg-f1-gray/60"
+            }`}
+          >
+            <span
+              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${
+                selected ? "border-f1-red bg-f1-red/20" : "border-f1-silver/50 bg-transparent"
+              }`}
+              aria-hidden
+            >
+              {selected && <span className="h-2 w-2 rounded-full bg-f1-red" />}
+            </span>
+            <div className="min-w-0 flex-1">
+              <span className="block font-medium text-f1-silver">{opt.label}</span>
+              <span className="mt-1 block text-xs leading-snug text-f1-silver/80">{opt.description}</span>
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+export function CreateGroupModal({ open, onClose, onCreated, currentUserId }: CreateGroupModalProps) {
+  const [form] = Form.useForm<{ name: string; predictionLockMode: PredictionLockMode }>();
 
   const handleSubmit = () => {
     form.validateFields().then((values) => {
@@ -19,6 +81,8 @@ export function CreateGroupModal({ open, onClose, onCreated }: CreateGroupModalP
         memberCount: 1,
         createdAt: new Date().toISOString(),
         inviteCode: `F1-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+        adminUserId: currentUserId,
+        predictionLockMode: values.predictionLockMode ?? "hybrid",
       };
       onCreated(newGroup);
       form.resetFields();
@@ -37,28 +101,36 @@ export function CreateGroupModal({ open, onClose, onCreated }: CreateGroupModalP
       onCancel={handleCancel}
       footer={null}
       destroyOnClose
-      width={400}
+      width={460}
       centered
-      className="!max-w-[calc(100vw-2rem)] [&_.ant-modal-content]:border [&_.ant-modal-content]:border-f1-gray [&_.ant-modal-content]:bg-f1-carbon [&_.ant-modal-header]:border-f1-gray [&_.ant-modal-header]:bg-transparent [&_.ant-modal-body]:pt-2"
+      className="create-group-modal max-w-[calc(100vw-2rem)] [&_.ant-modal-content]:overflow-hidden [&_.ant-modal-content]:rounded-2xl [&_.ant-modal-content]:border [&_.ant-modal-content]:border-f1-gray [&_.ant-modal-content]:bg-f1-carbon [&_.ant-modal-content]:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.6)] [&_.ant-modal-header]:border-f1-gray [&_.ant-modal-header]:bg-transparent [&_.ant-modal-body]:pt-6 [&_.ant-modal-close]:text-f1-silver [&_.ant-modal-close]:hover:text-f1-white"
       styles={{
-        content: { backgroundColor: "var(--color-f1-carbon, #1a1a1a)", maxWidth: "min(400px, calc(100vw - 32px))" },
-        header: { borderBottomColor: "var(--color-f1-gray, #2d2d2d)" },
+        content: {
+          backgroundColor: "var(--color-f1-carbon, #1a1a1a)",
+          maxWidth: "min(460px, calc(100vw - 32px))",
+          borderTop: "3px solid var(--color-f1-red, #e10600)",
+        },
+        header: { borderBottomColor: "var(--color-f1-gray, #2d2d2d)", paddingBottom: 16 },
       }}
       title={
-        <F1Title level={4} className="!mb-0">
-          Create a group
-        </F1Title>
+        <div className="pr-8">
+          <F1Title level={4} className="mb-0 text-f1-white">
+            Create a group
+          </F1Title>
+          <div className="mt-2 h-0.5 w-10 rounded-full bg-f1-red" aria-hidden />
+        </div>
       }
     >
       <Form
         form={form}
         layout="vertical"
         onFinish={handleSubmit}
-        className="mt-4"
+        className="mt-2"
+        requiredMark={false}
       >
         <Form.Item
           name="name"
-          label={<span className="text-f1-silver">Group name</span>}
+          label={<span className="text-sm font-medium text-f1-silver">Group name</span>}
           rules={[
             { required: true, message: "Enter a group name" },
             { min: 2, message: "At least 2 characters" },
@@ -66,13 +138,24 @@ export function CreateGroupModal({ open, onClose, onCreated }: CreateGroupModalP
         >
           <Input
             placeholder="e.g. Office Legends"
-            className="bg-f1-gray border-f1-gray text-f1-silver placeholder:!text-f1-silver/50"
+            className="h-11 rounded-lg border-f1-gray bg-f1-gray/80 text-f1-silver placeholder:text-f1-silver/50 focus:border-f1-red focus:shadow-[0_0_0_2px_rgba(225,6,0,0.2)] focus:outline-0"
             autoFocus
           />
         </Form.Item>
-        <div className="flex justify-end gap-2 pt-2">
-          <F1Button onClick={handleCancel}>Cancel</F1Button>
-          <F1Button type="primary" htmlType="submit">
+
+        <Form.Item
+          name="predictionLockMode"
+          label={<span className="text-sm font-medium text-f1-silver">When to lock predictions</span>}
+          initialValue="hybrid"
+        >
+          <LockModeCards />
+        </Form.Item>
+
+        <div className="flex justify-end gap-3 pt-4">
+          <F1Button onClick={handleCancel} className="min-w-[100px]">
+            Cancel
+          </F1Button>
+          <F1Button type="primary" htmlType="submit" className="min-w-[120px]">
             Create group
           </F1Button>
         </div>

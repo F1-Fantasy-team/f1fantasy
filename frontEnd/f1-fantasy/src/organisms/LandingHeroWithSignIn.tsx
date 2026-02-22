@@ -23,10 +23,10 @@ function HeroBannerBackground() {
 
 export function LandingHeroWithSignIn() {
   return (
-    <section className="relative flex min-h-[70vh] flex-col items-center justify-center py-10 sm:min-h-[80vh] sm:py-14">
+    <section className="relative flex min-h-screen min-h-[100dvh] flex-col items-center justify-center py-10 sm:py-14">
       <HeroBannerBackground />
-      <div className="relative z-10 flex w-full max-w-5xl flex-col items-stretch gap-8 px-4 sm:gap-10 md:flex-row md:items-center md:justify-between md:gap-12 lg:px-8">
-        <div className="w-full min-w-0 md:max-w-md">
+      <div className="relative z-10 flex w-full max-w-5xl flex-col items-stretch gap-8 px-4 sm:gap-10 md:flex-row md:items-center md:justify-between md:gap-12 lg:max-w-6xl lg:px-8 xl:max-w-7xl 2xl:max-w-[1440px]">
+        <div className="w-full min-w-0 md:max-w-md lg:max-w-lg">
           <LandingCopy />
         </div>
         <div className="w-full min-w-0 flex justify-center md:justify-end">

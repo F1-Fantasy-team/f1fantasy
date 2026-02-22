@@ -8,6 +8,8 @@ import { ZeroPointersEditor } from "../molecules/ZeroPointersEditor";
 import { CATEGORY_LABELS, CATEGORY_DESCRIPTIONS } from "../constants/predictionCategories";
 import { selectedCategoryIdState } from "../state/atoms";
 import { useDrivers, useConstructors } from "../state/useDriversAndConstructors";
+import { isUserLocked } from "../utils/predictionLock";
+import type { Group } from "../types/group";
 import type { PredictionCategoryId } from "../types/predictions";
 import type { GroupPredictionsData } from "../types/predictions";
 import type { Driver } from "../types/driver";
@@ -139,20 +141,21 @@ function EveryoneConstructorsTable({ data, currentUserId, constructors }: { data
 }
 
 type CategoryDetailViewProps = {
+  group: Group;
   categoryId: PredictionCategoryId;
   data: GroupPredictionsData;
   setData: (data: GroupPredictionsData | ((prev: GroupPredictionsData) => GroupPredictionsData)) => void;
   currentUserId: string;
 };
 
-export function CategoryDetailView({ categoryId, data, setData, currentUserId }: CategoryDetailViewProps) {
+export function CategoryDetailView({ group, categoryId, data, setData, currentUserId }: CategoryDetailViewProps) {
   const setSelectedCategoryId = useSetRecoilState(selectedCategoryIdState);
   const drivers = useDrivers();
   const constructors = useConstructors();
   const myStanding = data.standings.find((s) => s.userId === currentUserId);
   const myScore = myStanding?.categoryScores.find((c) => c.categoryId === categoryId)?.score;
   const myPredictions = data.predictions.find((p) => p.userId === currentUserId);
-  const isLocked = (data.lockedUserIds ?? []).includes(currentUserId);
+  const isLocked = isUserLocked(group, data, currentUserId);
 
   const handleSaveDriversChampionship = (driversChampionship: { position: number; driverId: string }[]) => {
     setData((prev) => ({
