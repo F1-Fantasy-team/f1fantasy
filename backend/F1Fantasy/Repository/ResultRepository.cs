@@ -128,6 +128,27 @@ public class ResultRepository
             .ThenBy(r => int.Parse(r.Position));
     }
 
+    public async Task<int?> GetLatestRoundWithResultsAsync(string season)
+    {
+        _logger.LogDebug("Getting latest round with results for season {Season}", season);
+        
+        var rounds = await _context.Results
+            .Where(r => r.Season == season && !r.IsSprint)
+            .Select(r => r.Round)
+            .Distinct()
+            .ToListAsync();
+        
+        if (!rounds.Any())
+        {
+            _logger.LogDebug("No results found for season {Season}", season);
+            return null;
+        }
+        
+        var latestRound = rounds.Max(r => int.Parse(r));
+        _logger.LogDebug("Latest round with results for season {Season}: {Round}", season, latestRound);
+        return latestRound;
+    }
+
     public async Task ClearAsync()
     {
         _logger.LogWarning("Clearing all results from database");

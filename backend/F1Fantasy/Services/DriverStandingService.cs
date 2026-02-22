@@ -21,6 +21,47 @@ public class DriverStandingService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Cache-first: Returns cached driver standings if available, otherwise fetches from API
+    /// </summary>
+    public async Task<StandingsList?> GetDriverStandingsBySeasonCachedAsync(string season)
+    {
+        _logger.LogInformation("Checking cache for driver standings for season {Season}", season);
+        
+        var cachedStandings = await _repository.GetBySeasonAsync(season);
+        if (cachedStandings.Any())
+        {
+            // Convert DriverStanding to DriverStandingEntry
+            // Note: Driver navigation property is not loaded from DB, so we create it from DriverId
+            var driverStandingEntries = cachedStandings
+                .OrderBy(s => int.Parse(s.Position))
+                .Select(s => new DriverStandingEntry
+                {
+                    Position = s.Position,
+                    PositionText = s.PositionText,
+                    Points = s.Points,
+                    Wins = s.Wins,
+                    Driver = new Driver { DriverId = s.DriverId }, // Create Driver from DriverId
+                    Constructors = !string.IsNullOrEmpty(s.ConstructorId) 
+                        ? new List<Constructor> { new Constructor { ConstructorId = s.ConstructorId } } 
+                        : null
+                })
+                .ToList();
+
+            var standingsList = new StandingsList
+            {
+                Season = season,
+                DriverStandings = driverStandingEntries
+            };
+            
+            _logger.LogInformation("Returning cached driver standings for season {Season} ({Count} drivers)", season, cachedStandings.Count());
+            return standingsList;
+        }
+
+        _logger.LogInformation("No cached driver standings found for season {Season}, fetching from API", season);
+        return await GetDriverStandingsBySeasonAsync(season);
+    }
+
     public async Task<StandingsList?> GetDriverStandingsBySeasonAsync(string season)
     {
         _logger.LogInformation("Fetching driver standings for season {Season}", season);

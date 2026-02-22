@@ -21,13 +21,32 @@ public class QualifyingService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Cache-first: Returns cached qualifying data if available, otherwise fetches from API
+    /// </summary>
+    public async Task<IEnumerable<RaceWithQualifying>> GetQualifyingBySeasonCachedAsync(string season)
+    {
+        _logger.LogInformation("Checking cache for qualifying results for season {Season}", season);
+        
+        var cachedData = await BuildQualifyingFromCache(season);
+        if (cachedData.Any())
+        {
+            _logger.LogInformation("Returning cached qualifying data for season {Season} ({Count} races)", season, cachedData.Count());
+            return cachedData;
+        }
+
+        _logger.LogInformation("No cached qualifying data found for season {Season}, fetching from API", season);
+        return await GetQualifyingBySeasonAsync(season);
+    }
+
     public async Task<IEnumerable<RaceWithQualifying>> GetQualifyingBySeasonAsync(string season)
     {
         _logger.LogInformation("Fetching qualifying results for season {Season} from API", season);
         
         try
         {
-            var content = await _apiHttpClient.GetStringWithRetryAsync($"{ApiBaseUrl}/{season}/qualifying/");
+            // Use limit=1000 to ensure we get all races in the season (typical F1 season has 20-24 races)
+            var content = await _apiHttpClient.GetStringWithRetryAsync($"{ApiBaseUrl}/{season}/qualifying.json?limit=1000");
             var apiResponse = JsonSerializer.Deserialize<QualifyingApiResponse>(content, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
@@ -170,6 +189,16 @@ public class QualifyingService
     private async Task<IEnumerable<RaceWithQualifying>> BuildQualifyingFromCache(string season)
     {
         var cachedQualifying = await _qualifyingRepository.GetBySeasonAsync(season);
+        
+        // Populate Driver and Constructor navigation properties from IDs
+        foreach (var q in cachedQualifying)
+        {
+            if (!string.IsNullOrEmpty(q.DriverId))
+                q.Driver = new Driver { DriverId = q.DriverId };
+            if (!string.IsNullOrEmpty(q.ConstructorId))
+                q.Constructor = new Constructor { ConstructorId = q.ConstructorId };
+        }
+        
         var groupedByRace = cachedQualifying.GroupBy(q => new { q.Season, q.Round });
 
         return groupedByRace.Select(g => new RaceWithQualifying
