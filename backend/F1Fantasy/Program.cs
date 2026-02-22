@@ -4,8 +4,10 @@ using F1Fantasy.Middleware;
 using F1Fantasy.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.IO.Compression;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
@@ -29,6 +31,21 @@ var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 builder.WebHost.ConfigureKestrel(options =>
 {
     options.ListenAnyIP(int.Parse(port));
+    
+    // Limit request body size to prevent abuse (10MB max)
+    options.Limits.MaxRequestBodySize = 10 * 1024 * 1024; // 10MB
+    
+    // Limit concurrent connections to prevent resource exhaustion
+    options.Limits.MaxConcurrentConnections = 100;
+    options.Limits.MaxConcurrentUpgradedConnections = 100;
+    
+    // Request timeout to kill long-running requests (2 minutes)
+    options.Limits.RequestHeadersTimeout = TimeSpan.FromSeconds(30);
+    options.Limits.KeepAliveTimeout = TimeSpan.FromSeconds(120);
+    
+    // Limit header size to prevent header-based DoS
+    options.Limits.MaxRequestHeadersTotalSize = 32 * 1024; // 32KB
+    options.Limits.MaxRequestLineSize = 8 * 1024; // 8KB
 });
 
 // Configure logging
@@ -58,7 +75,27 @@ builder.Services.AddDbContext<F1FantasyDbContext>(options =>
     {
         throw new InvalidOperationException("Database connection string 'DefaultConnection' not found. Please configure it in appsettings.json or environment variables.");
     }
-    options.UseNpgsql(connString);
+    options.UseNpgsql(connString, npgsqlOptions =>
+    {
+        // Set command timeout to prevent long-running queries (30 seconds)
+        npgsqlOptions.CommandTimeout(30);
+        
+        // Enable retry on failure (helpful for transient network issues on Render)
+        npgsqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 3,
+            maxRetryDelay: TimeSpan.FromSeconds(5),
+            errorCodesToAdd: null);
+    });
+    
+    // Disable query tracking by default for read-only queries (performance)
+    options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
+    
+    // Log slow queries in development
+    if (builder.Environment.IsDevelopment())
+    {
+        options.EnableSensitiveDataLogging();
+        options.EnableDetailedErrors();
+    }
 });
 
 // Add services to the container.
@@ -230,6 +267,36 @@ builder.Services.AddRateLimiter(options =>
     options.ConfigureRateLimitRejection();
 });
 
+// Add response compression to reduce bandwidth costs
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+    options.MimeTypes = new[]
+    {
+        "application/json",
+        "application/xml",
+        "text/plain",
+        "text/html",
+        "text/css",
+        "application/javascript"
+    };
+});
+
+builder.Services.Configure<BrotliCompressionProviderOptions>(options =>
+{
+    options.Level = CompressionLevel.Fastest; // Balance speed vs compression
+});
+
+builder.Services.Configure<GzipCompressionProviderOptions>(options =>
+{
+    options.Level = CompressionLevel.Fastest;
+});
+
+// Add response caching to reduce repeated requests
+builder.Services.AddResponseCaching();
+
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -253,6 +320,12 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Add response compression early in pipeline (before other middleware)
+app.UseResponseCompression();
+
+// Add cache headers to reduce repeated requests
+app.UseMiddleware<CacheHeaderMiddleware>();
+
 // Add IP blacklist middleware - MUST be early in pipeline
 app.UseMiddleware<IpBlacklistMiddleware>();
 
@@ -274,6 +347,9 @@ if (app.Environment.IsDevelopment())
 
 // Enable CORS - must be before UseAuthorization
 app.UseCors("AllowFrontend");
+
+// Enable response caching to reduce duplicate requests
+app.UseResponseCaching();
 
 // Enable rate limiting - must be after CORS and before authentication
 app.UseRateLimiter();
