@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace F1Fantasy.Models;
 
 public class WildcardPrediction
@@ -14,5 +16,6 @@ public class WildcardPrediction
     public DateTime? UpdatedAt { get; set; }
 
     // Navigation property
+    [JsonIgnore]
     public Group Group { get; set; } = null!;
 }
