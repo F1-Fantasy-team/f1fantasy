@@ -132,9 +132,14 @@ public class ConstructorService
             var constructors = apiResponse.MRData.ConstructorTable.Constructors;
             _logger.LogInformation("Retrieved {Count} constructors for season {Season} from API", constructors.Count, season);
 
-            // Store in repository
+            // Store in repository and add season to ActiveSeasons
             foreach (var constructor in constructors)
             {
+                // Add this season to ActiveSeasons if not already present
+                if (!constructor.ActiveSeasons.Contains(season))
+                {
+                    constructor.ActiveSeasons.Add(season);
+                }
                 await _constructorRepository.AddOrUpdateAsync(constructor);
             }
 

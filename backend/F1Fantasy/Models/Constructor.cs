@@ -6,6 +6,7 @@ public class Constructor
     public string Url { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Nationality { get; set; } = string.Empty;
+    public List<string> ActiveSeasons { get; set; } = new List<string>();
 }
 
 // API Response models for Constructors endpoint
