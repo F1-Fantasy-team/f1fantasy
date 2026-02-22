@@ -102,16 +102,4 @@ public static class ValidationExtensions
             throw new ArgumentException($"Season must be between 1950 and {DateTime.UtcNow.Year + 1}");
         }
     }
-
-    /// <summary>
-    /// Validates lock mode is a valid enum value
-    /// </summary>
-    public static void ValidateLockMode(string lockMode)
-    {
-        var validModes = new[] { "admin", "system", "hybrid" };
-        if (!validModes.Contains(lockMode.ToLower()))
-        {
-            throw new ArgumentException($"Lock mode must be one of: {string.Join(", ", validModes)}");
-        }
-    }
 }

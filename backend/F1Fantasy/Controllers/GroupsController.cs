@@ -247,7 +247,7 @@ public record CreateGroupRequest(
     [RegularExpression(@"^[^<>]*$", ErrorMessage = "Group name contains invalid characters")]
     string Name,
     
-    [RegularExpression(@"^(manual|auto|never)$", ErrorMessage = "Lock mode must be 'manual', 'auto', or 'never'")]
+    [RegularExpression(@"^(admin|system|hybrid)$", ErrorMessage = "Lock mode must be 'admin', 'system', or 'hybrid'")]
     string LockMode
 );
 
