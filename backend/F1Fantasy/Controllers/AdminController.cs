@@ -40,7 +40,7 @@ public class AdminController : ControllerBase
             var adminUserId = GetUserId();
             if (!await IsGroupAdminAsync(groupId, adminUserId))
             {
-                return Forbid("Only group admin can set wildcard points");
+                return StatusCode(403, new { error = "Only group admin can set wildcard points" });
             }
 
             if (request.PointsPotential < 100 || request.PointsPotential > 200)
@@ -73,7 +73,7 @@ public class AdminController : ControllerBase
             var adminUserId = GetUserId();
             if (!await IsGroupAdminAsync(groupId, adminUserId))
             {
-                return Forbid("Only group admin can mark wildcard as fulfilled");
+                return StatusCode(403, new { error = "Only group admin can mark wildcard as fulfilled" });
             }
 
             var prediction = await _predictionRepository.GetWildcardAsync(groupId, userId);
@@ -101,7 +101,7 @@ public class AdminController : ControllerBase
             var adminUserId = GetUserId();
             if (!await IsGroupAdminAsync(groupId, adminUserId))
             {
-                return Forbid("Only group admin can view all wildcards");
+                return StatusCode(403, new { error = "Only group admin can view all wildcards" });
             }
 
             var wildcards = await _predictionRepository.GetAllWildcardsAsync(groupId);

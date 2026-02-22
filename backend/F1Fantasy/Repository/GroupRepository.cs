@@ -58,10 +58,18 @@ public class GroupRepository
 
     public async Task DeleteAsync(int id)
     {
-        var group = await _context.Groups.FindAsync(id);
+        var group = await _context.Groups
+            .Include(g => g.Members)
+            .FirstOrDefaultAsync(g => g.Id == id);
+        
         if (group != null)
         {
+            // Explicitly remove all members first to ensure cascade works
+            _context.GroupMembers.RemoveRange(group.Members);
+            
+            // Then remove the group
             _context.Groups.Remove(group);
+            
             await _context.SaveChangesAsync();
         }
     }

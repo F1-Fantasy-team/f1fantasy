@@ -137,7 +137,7 @@ public class GroupsController : ControllerBase
         }
         catch (UnauthorizedAccessException ex)
         {
-            return Forbid(ex.Message);
+            return StatusCode(403, new { error = ex.Message });
         }
         catch (ArgumentException ex)
         {
@@ -164,7 +164,7 @@ public class GroupsController : ControllerBase
         }
         catch (UnauthorizedAccessException ex)
         {
-            return Forbid(ex.Message);
+            return StatusCode(403, new { error = ex.Message });
         }
         catch (Exception ex)
         {
@@ -183,7 +183,7 @@ public class GroupsController : ControllerBase
         }
         catch (UnauthorizedAccessException ex)
         {
-            return Forbid(ex.Message);
+            return StatusCode(403, new { error = ex.Message });
         }
         catch (InvalidOperationException ex)
         {
@@ -210,7 +210,7 @@ public class GroupsController : ControllerBase
         }
         catch (UnauthorizedAccessException ex)
         {
-            return Forbid(ex.Message);
+            return StatusCode(403, new { error = ex.Message });
         }
         catch (Exception ex)
         {
@@ -229,7 +229,7 @@ public class GroupsController : ControllerBase
         }
         catch (UnauthorizedAccessException ex)
         {
-            return Forbid(ex.Message);
+            return StatusCode(403, new { error = ex.Message });
         }
         catch (InvalidOperationException ex)
         {
