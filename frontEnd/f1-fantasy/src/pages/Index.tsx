@@ -208,8 +208,9 @@ export default function Index() {
       currentUserDisplayName
     ).then((result) => {
       if (cancelled || result == null) return;
-      const standingsWithMe = ensureCurrentUserInStandings(
+      const standingsWithAllMembers = mergeStandingsWithGroupMembers(
         result.standings,
+        selectedGroup,
         currentUserId,
         currentUserDisplayName
       );
@@ -219,7 +220,7 @@ export default function Index() {
           standings: [],
           predictions: [],
         }),
-        standings: standingsWithMembers,
+        standings: standingsWithAllMembers,
         predictions: (prev?.predictions ?? []).filter(
           (p) => p.userId !== currentUserId
         ).concat(result.predictions),
@@ -401,7 +402,7 @@ export default function Index() {
             group={selectedGroup}
             categoryId={selectedCategoryId as PredictionCategoryId}
             data={data}
-            setData={setGroupData}
+            setData={(newData) => setGroupData(typeof newData === 'function' ? (prev) => newData(prev ?? data) : newData)}
             currentUserId={currentUserId}
             onSavePrediction={
               getApiBaseUrl()
@@ -414,7 +415,7 @@ export default function Index() {
           <GroupPredictionsView
             group={selectedGroup}
             data={data}
-            setData={setGroupData}
+            setData={(newData) => setGroupData(typeof newData === 'function' ? (prev) => newData(prev ?? data) : newData)}
             currentUserId={currentUserId}
             currentUserDisplayName={currentUserDisplayName}
             onDeleteGroup={handleDeleteGroup}
@@ -444,7 +445,11 @@ export default function Index() {
   };
 
   const findGroupByCode = async (code: string): Promise<Group | undefined> => {
-    if (!getApiBaseUrl()) return undefined;
+    if (!getApiBaseUrl()) {
+      // Fallback to local allGroups when API not configured
+      const normalized = code.trim().toUpperCase();
+      return allGroups.find((g) => g.inviteCode?.toUpperCase() === normalized);
+    }
     const group = await fetchGroupByInviteCodeFromApi(code);
     return group ?? undefined;
   };
