@@ -154,7 +154,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         // Replace with YOUR actual Frontend API URL from Clerk Dashboard
-        var frontendApiUrl = "https://clerk.f1fantasy-1.onrender/";  // ← change this!
+        var frontendApiUrl = "https://clerk.f1fantasy.no/";  // ← change this!
 
         options.Authority = frontendApiUrl;                     // Enables discovery
         options.MetadataAddress = $"{frontendApiUrl}/.well-known/openid-configuration"; // optional but good
