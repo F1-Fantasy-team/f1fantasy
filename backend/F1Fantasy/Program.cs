@@ -311,8 +311,8 @@ builder.Services.AddCors(options =>
             "http://localhost:5173",  // Vite dev server
             "http://localhost:3000",  // Alternative dev port
             "https://f1fantasy-1.onrender.com",
-            "https://f1fantasy.no/",
-            "https://www.f1fantasy.no/"
+            "https://f1fantasy.no",
+            "https://www.f1fantasy.no"
         )
         .AllowAnyMethod()
         .AllowAnyHeader()
