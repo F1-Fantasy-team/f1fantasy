@@ -66,7 +66,6 @@ export function JoinGroupModal({
       centered
       className="!max-w-[calc(100vw-2rem)] [&_.ant-modal-content]:border [&_.ant-modal-content]:border-f1-gray [&_.ant-modal-content]:bg-f1-carbon [&_.ant-modal-header]:border-f1-gray [&_.ant-modal-header]:bg-transparent [&_.ant-modal-body]:pt-2"
       styles={{
-        content: { backgroundColor: "var(--color-f1-carbon, #1a1a1a)", maxWidth: "min(400px, calc(100vw - 32px))" },
         header: { borderBottomColor: "var(--color-f1-gray, #2d2d2d)" },
       }}
       title={

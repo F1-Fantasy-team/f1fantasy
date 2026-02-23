@@ -73,7 +73,7 @@ function LockModeCards({
   );
 }
 
-export function CreateGroupModal({ open, onClose, onCreated, createGroup, currentUserId }: CreateGroupModalProps) {
+export function CreateGroupModal({ open, onClose, onCreated, createGroup }: CreateGroupModalProps) {
   const { message } = App.useApp();
   const [form] = Form.useForm<{ name: string; predictionLockMode: PredictionLockMode }>();
   const [submitting, setSubmitting] = useState(false);
@@ -110,13 +110,8 @@ export function CreateGroupModal({ open, onClose, onCreated, createGroup, curren
       destroyOnHidden
       width={460}
       centered
-      className="create-group-modal max-w-[calc(100vw-2rem)] [&_.ant-modal-content]:overflow-hidden [&_.ant-modal-content]:rounded-2xl [&_.ant-modal-content]:border [&_.ant-modal-content]:border-f1-gray [&_.ant-modal-content]:bg-f1-carbon [&_.ant-modal-content]:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.6)] [&_.ant-modal-header]:border-f1-gray [&_.ant-modal-header]:bg-transparent [&_.ant-modal-body]:pt-6 [&_.ant-modal-close]:text-f1-silver [&_.ant-modal-close]:hover:text-f1-white"
+      className="create-group-modal max-w-[calc(100vw-2rem)] [&_.ant-modal-content]:overflow-hidden [&_.ant-modal-content]:rounded-2xl [&_.ant-modal-content]:border [&_.ant-modal-content]:border-f1-gray [&_.ant-modal-content]:bg-f1-carbon [&_.ant-modal-content]:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.6)] [&_.ant-modal-content]:border-t-[3px] [&_.ant-modal-content]:border-t-f1-red [&_.ant-modal-header]:border-f1-gray [&_.ant-modal-header]:bg-transparent [&_.ant-modal-body]:pt-6 [&_.ant-modal-close]:text-f1-silver [&_.ant-modal-close]:hover:text-f1-white"
       styles={{
-        content: {
-          backgroundColor: "var(--color-f1-carbon, #1a1a1a)",
-          maxWidth: "min(460px, calc(100vw - 32px))",
-          borderTop: "3px solid var(--color-f1-red, #e10600)",
-        },
         header: { borderBottomColor: "var(--color-f1-gray, #2d2d2d)", paddingBottom: 16 },
       }}
       title={

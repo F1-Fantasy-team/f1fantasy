@@ -164,12 +164,11 @@ type CategoryDetailViewProps = {
 
 export function CategoryDetailView({ group, categoryId, data, setData, currentUserId, onSavePrediction }: CategoryDetailViewProps) {
   const { message } = App.useApp();
-  const [adminWildcards, setAdminWildcards] = useState<AdminWildcardApi[] | null>(null);
+  const [, setAdminWildcards] = useState<AdminWildcardApi[] | null>(null);
   const setSelectedCategoryId = useSetRecoilState(selectedCategoryIdState);
   const firstRaceDateFromRaces = useRecoilValue(firstRaceDateState);
   const drivers = useDrivers();
   const constructors = useConstructors();
-  const myStanding = data.standings.find((s) => s.userId === currentUserId);
   const isAdmin = isGroupAdmin(group, currentUserId);
 
   useEffect(() => {
@@ -184,7 +183,6 @@ export function CategoryDetailView({ group, categoryId, data, setData, currentUs
     }
   }, [categoryId, group.id, isAdmin]);
 
-  const myScore = myStanding?.categoryScores.find((c) => c.categoryId === categoryId)?.score;
   const myPredictions = data.predictions.find((p) => p.userId === currentUserId);
   const isLocked = isUserLocked(group, data, currentUserId, firstRaceDateFromRaces);
 

@@ -122,7 +122,6 @@ export async function postConstructorChampionshipFromApi(
 
 // ----- Two-driver categories -----
 async function fetchTwoDriverFromApi(
-  groupId: string,
   path: string
 ): Promise<{ driverId1: string; driverId2: string } | null> {
   if (!getApiBaseUrl()) return null;
@@ -143,7 +142,7 @@ async function postTwoDriverFromApi(
 ): Promise<void> {
   await apiPost(path, {
     driver1Id: body.driverId1,
-    driver2Id: body.driver2Id,
+    driver2Id: body.driverId2,
   });
 }
 
@@ -151,7 +150,6 @@ export function fetchDriverDraftFromApi(
   groupId: string
 ): Promise<DriverDraftPrediction | null> {
   return fetchTwoDriverFromApi(
-    groupId,
     `/api/predictions/groups/${groupId}/driver-draft`
   );
 }
@@ -170,7 +168,6 @@ export function fetchDestructorFromApi(
   groupId: string
 ): Promise<DestructorsPrediction | null> {
   return fetchTwoDriverFromApi(
-    groupId,
     `/api/predictions/groups/${groupId}/destructor`
   );
 }
@@ -189,7 +186,6 @@ export function fetchMrSaturdayFromApi(
   groupId: string
 ): Promise<MrSaturdayPrediction | null> {
   return fetchTwoDriverFromApi(
-    groupId,
     `/api/predictions/groups/${groupId}/mr-saturday`
   );
 }
