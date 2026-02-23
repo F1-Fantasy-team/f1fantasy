@@ -310,9 +310,9 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(
             "http://localhost:5173",  // Vite dev server
             "http://localhost:3000",  // Alternative dev port
-            "https://f1fantasy.com",  // Production domain (add your actual domain)
-            "https://www.f1fantasy.com",
-            "https://f1fantasy-1.onrender.com"
+            "https://f1fantasy-1.onrender.com",
+            "https://f1fantasy.no/",
+            "https://www.f1fantasy.no/"
         )
         .AllowAnyMethod()
         .AllowAnyHeader()
