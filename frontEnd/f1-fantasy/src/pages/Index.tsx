@@ -44,21 +44,32 @@ function mergeStandingsWithGroupMembers(
   currentUserId: string,
   currentUserDisplayName: string
 ): MemberStanding[] {
-  const memberIds = group.members?.length
-    ? group.members.map((m) => m.userId)
-    : [currentUserId];
+  const members = group.members?.length
+    ? group.members
+    : [{ userId: currentUserId, displayName: currentUserDisplayName }];
+
   const byUserId = new Map(apiStandings.map((s) => [s.userId, s]));
-  const merged: MemberStanding[] = memberIds.map((userId) => {
+
+  const merged: MemberStanding[] = members.map(({ userId, displayName }) => {
     const existing = byUserId.get(userId);
     if (existing) return existing;
+
+    const effectiveDisplayName =
+      userId === currentUserId
+        ? currentUserDisplayName
+        : displayName && displayName.trim().length > 0
+        ? displayName
+        : userId;
+
     return {
       userId,
-      displayName: userId === currentUserId ? currentUserDisplayName : userId,
+      displayName: effectiveDisplayName,
       overallScore: 0,
       rank: 0,
       categoryScores: [],
     };
   });
+
   merged.sort((a, b) => b.overallScore - a.overallScore);
   return merged.map((s, i) => ({ ...s, rank: i + 1 }));
 }

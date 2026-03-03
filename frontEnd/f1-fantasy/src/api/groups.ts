@@ -7,6 +7,8 @@ export interface GroupMemberApi {
   id: number;
   groupId: number;
   userId: string;
+  /** Optional display name for this user within the group. */
+  displayName?: string;
   joinedAt: string;
 }
 
@@ -33,7 +35,10 @@ function mapGroupApiToGroup(api: GroupApi): Group {
     adminUserId: api.adminUserId || undefined,
     predictionLockMode: api.lockMode as PredictionLockMode,
     predictionsLocked: api.predictionsLocked,
-    members: api.members?.map((m) => ({ userId: m.userId })),
+    members: api.members?.map((m) => ({
+      userId: m.userId,
+      displayName: m.displayName,
+    })),
   };
 }
 
