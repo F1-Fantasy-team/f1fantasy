@@ -48,17 +48,25 @@ public class ClerkService
             return cachedName;
         }
 
-        // Try to get from database cache (still fast)
-        var dbCache = await _context.UserDisplayNameCache
-            .AsNoTracking()
-            .FirstOrDefaultAsync(u => u.UserId == userId);
-            
-        if (dbCache != null && dbCache.ExpiresAt > DateTime.UtcNow)
+        // Try to get from database cache (still fast) - handle gracefully if table doesn't exist
+        try
         {
-            // Cache hit in database, update memory cache and return
-            _cache.Set(memoryCacheKey, dbCache.DisplayName, MemoryCacheDuration);
-            _logger.LogDebug("[GetUserDisplayNameAsync] Retrieved from database cache - UserId: {UserId}, Elapsed: {Elapsed}ms", userId, stopwatch.ElapsedMilliseconds);
-            return dbCache.DisplayName;
+            var dbCache = await _context.UserDisplayNameCache
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.UserId == userId);
+                
+            if (dbCache != null && dbCache.ExpiresAt > DateTime.UtcNow)
+            {
+                // Cache hit in database, update memory cache and return
+                _cache.Set(memoryCacheKey, dbCache.DisplayName, MemoryCacheDuration);
+                _logger.LogDebug("[GetUserDisplayNameAsync] Retrieved from database cache - UserId: {UserId}, Elapsed: {Elapsed}ms", userId, stopwatch.ElapsedMilliseconds);
+                return dbCache.DisplayName;
+            }
+        }
+        catch (Exception dbEx)
+        {
+            // Database cache not available (table might not exist yet), continue to API fetch
+            _logger.LogWarning(dbEx, "[GetUserDisplayNameAsync] Database cache unavailable for UserId: {UserId}, falling back to API", userId);
         }
 
         // Cache miss or expired, fetch from Clerk API
@@ -165,10 +173,19 @@ public class ClerkService
         _logger.LogInformation("[GetUserDisplayNamesAsync] Fetching {Count} unique user display names", uniqueUserIds.Count);
         
         // First, try to get all from database cache in one query
-        var cachedUsers = await _context.UserDisplayNameCache
-            .AsNoTracking()
-            .Where(u => uniqueUserIds.Contains(u.UserId) && u.ExpiresAt > DateTime.UtcNow)
-            .ToListAsync();
+        List<UserDisplayNameCache> cachedUsers;
+        try
+        {
+            cachedUsers = await _context.UserDisplayNameCache
+                .AsNoTracking()
+                .Where(u => uniqueUserIds.Contains(u.UserId) && u.ExpiresAt > DateTime.UtcNow)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[GetUserDisplayNamesAsync] Database cache query failed (table may not exist yet), falling back to API");
+            cachedUsers = new List<UserDisplayNameCache>();
+        }
             
         _logger.LogInformation("[GetUserDisplayNamesAsync] Found {Count} users in database cache - Elapsed: {Elapsed}ms", 
             cachedUsers.Count, stopwatch.ElapsedMilliseconds);
