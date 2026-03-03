@@ -18,7 +18,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { HolderOutlined } from "@ant-design/icons";
 import { F1Button, F1Text } from "../atoms";
-import { useDrivers, useDriversFromApi } from "../state/useDriversAndConstructors";
+import { useDrivers } from "../state/useDriversAndConstructors";
 import type { DriversChampionshipPrediction } from "../types/predictions";
 
 function SortableDriverRow({
@@ -63,7 +63,6 @@ type DriversChampionshipEditorProps = {
 
 export function DriversChampionshipEditor({ value, onSave }: DriversChampionshipEditorProps) {
     const drivers = useDrivers();
-    const fromApi = useDriversFromApi();
     const sorted = (value ?? []).slice().sort((a, b) => a.position - b.position);
     const existingIds = sorted.map((e) => e.driverId);
     const missingIds = drivers.map((d) => d.id).filter((id) => !existingIds.includes(id));
