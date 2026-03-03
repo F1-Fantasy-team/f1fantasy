@@ -8,19 +8,19 @@ public class PredictionService
 {
     private readonly PredictionRepository _predictionRepository;
     private readonly GroupRepository _groupRepository;
-    private readonly ConstructorRepository _constructorRepository;
-    private readonly DriverRepository _driverRepository;
+    private readonly ConstructorService _constructorService;
+    private readonly DriverService _driverService;
 
     public PredictionService(
         PredictionRepository predictionRepository,
         GroupRepository groupRepository,
-        ConstructorRepository constructorRepository,
-        DriverRepository driverRepository)
+        ConstructorService constructorService,
+        DriverService driverService)
     {
         _predictionRepository = predictionRepository;
         _groupRepository = groupRepository;
-        _constructorRepository = constructorRepository;
-        _driverRepository = driverRepository;
+        _constructorService = constructorService;
+        _driverService = driverService;
     }
 
     private async Task ValidateGroupAndLockAsync(int groupId, string userId)
@@ -59,7 +59,7 @@ public class PredictionService
         }
 
         // Validate: Must have all active constructors for current season, no duplicates
-        var activeConstructors = await _constructorRepository.GetActiveConstructorsAsync();
+        var activeConstructors = await _constructorService.GetActiveConstructorsAsync();
         var constructorIds = activeConstructors.Select(c => c.ConstructorId).ToList();
 
         if (rankedConstructorIds.Count != constructorIds.Count)
@@ -109,7 +109,7 @@ public class PredictionService
         }
 
         // Validate: Must have all active drivers (typically 20), no duplicates
-        var activeDrivers = await _driverRepository.GetActiveDriversAsync();
+        var activeDrivers = await _driverService.GetActiveDriversAsync();
         var driverIds = activeDrivers.Select(d => d.DriverId).ToList();
         var expectedCount = driverIds.Count;
 
@@ -155,7 +155,7 @@ public class PredictionService
             throw new ArgumentException("Cannot select the same driver twice");
         }
 
-        var activeDrivers = await _driverRepository.GetActiveDriversAsync();
+        var activeDrivers = await _driverService.GetActiveDriversAsync();
         var driverIds = activeDrivers.Select(d => d.DriverId).ToList();
 
         if (driver1Id != null && !driverIds.Contains(driver1Id))
@@ -195,7 +195,7 @@ public class PredictionService
             throw new ArgumentException("Cannot select the same driver twice");
         }
 
-        var activeDrivers = await _driverRepository.GetActiveDriversAsync();
+        var activeDrivers = await _driverService.GetActiveDriversAsync();
         var driverIds = activeDrivers.Select(d => d.DriverId).ToList();
 
         if (driver1Id != null && !driverIds.Contains(driver1Id))
@@ -235,7 +235,7 @@ public class PredictionService
             throw new ArgumentException("Cannot select the same driver twice");
         }
 
-        var activeDrivers = await _driverRepository.GetActiveDriversAsync();
+        var activeDrivers = await _driverService.GetActiveDriversAsync();
         var driverIds = activeDrivers.Select(d => d.DriverId).ToList();
 
         if (driver1Id != null && !driverIds.Contains(driver1Id))
@@ -277,7 +277,7 @@ public class PredictionService
         }
 
         // Validate all driver IDs exist and are active in current season
-        var activeDrivers = await _driverRepository.GetActiveDriversAsync();
+        var activeDrivers = await _driverService.GetActiveDriversAsync();
         var validDriverIds = activeDrivers.Select(d => d.DriverId).ToList();
 
         foreach (var driverId in driverIds)
