@@ -57,6 +57,69 @@ public class DriverRepository
             throw;
         }
     }
+    
+    public async Task AddOrUpdateBatchAsync(IEnumerable<Driver> drivers)
+    {
+        var driverList = drivers.ToList();
+        if (!driverList.Any())
+        {
+            return;
+        }
+        
+        try
+        {
+            var driverIds = driverList.Select(d => d.DriverId).ToList();
+            
+            // Single query to get all existing drivers
+            var existingDrivers = await _context.Drivers
+                .Where(d => driverIds.Contains(d.DriverId))
+                .ToDictionaryAsync(d => d.DriverId);
+            
+            var addedCount = 0;
+            var updatedCount = 0;
+            
+            foreach (var driver in driverList)
+            {
+                if (existingDrivers.TryGetValue(driver.DriverId, out var existing))
+                {
+                    // Update existing driver
+                    existing.PermanentNumber = driver.PermanentNumber;
+                    existing.Code = driver.Code;
+                    existing.GivenName = driver.GivenName;
+                    existing.FamilyName = driver.FamilyName;
+                    existing.DateOfBirth = driver.DateOfBirth;
+                    existing.Nationality = driver.Nationality;
+                    existing.Url = driver.Url;
+                    
+                    // Merge ActiveSeasons
+                    foreach (var season in driver.ActiveSeasons)
+                    {
+                        if (!existing.ActiveSeasons.Contains(season))
+                        {
+                            existing.ActiveSeasons.Add(season);
+                        }
+                    }
+                    updatedCount++;
+                }
+                else
+                {
+                    // Add new driver
+                    await _context.Drivers.AddAsync(driver);
+                    addedCount++;
+                }
+            }
+            
+            // Single SaveChanges call for all changes
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Batch processed {Total} drivers: {Added} added, {Updated} updated", 
+                driverList.Count, addedCount, updatedCount);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error batch saving {Count} drivers", driverList.Count);
+            throw;
+        }
+    }
 
     public async Task<Driver?> GetByDriverIdAsync(string driverId)
     {

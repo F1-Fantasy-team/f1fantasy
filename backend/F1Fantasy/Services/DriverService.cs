@@ -134,16 +134,17 @@ public class DriverService
             var drivers = apiResponse.MRData.DriverTable.Drivers;
             _logger.LogInformation("Retrieved {Count} drivers for season {Season} from API", drivers.Count, season);
 
-            // Store in repository and add season to ActiveSeasons
+            // Add this season to ActiveSeasons for all drivers
             foreach (var driver in drivers)
             {
-                // Add this season to ActiveSeasons if not already present
                 if (!driver.ActiveSeasons.Contains(season))
                 {
                     driver.ActiveSeasons.Add(season);
                 }
-                await _driverRepository.AddOrUpdateAsync(driver);
             }
+            
+            // Batch save all drivers in one operation
+            await _driverRepository.AddOrUpdateBatchAsync(drivers);
 
             return drivers;
         }

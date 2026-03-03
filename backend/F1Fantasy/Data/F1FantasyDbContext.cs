@@ -38,6 +38,9 @@ public class F1FantasyDbContext : DbContext
     public DbSet<ZeroPointerPrediction> ZeroPointerPredictions { get; set; }
     public DbSet<WildcardPrediction> WildcardPredictions { get; set; }
     public DbSet<Standing> Standings { get; set; }
+    
+    // Cache DbSets
+    public DbSet<UserDisplayNameCache> UserDisplayNameCache { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -484,6 +487,18 @@ public class F1FantasyDbContext : DbContext
             entity.Property(d => d.ErrorMessage).HasMaxLength(500);
             
             entity.HasIndex(d => new { d.Season, d.DataType }).IsUnique();
+        });
+        
+        // UserDisplayNameCache configuration
+        modelBuilder.Entity<UserDisplayNameCache>(entity =>
+        {
+            entity.HasKey(u => u.UserId);
+            entity.Property(u => u.UserId).HasMaxLength(100).IsRequired();
+            entity.Property(u => u.DisplayName).HasMaxLength(200).IsRequired();
+            entity.Property(u => u.CachedAt).IsRequired();
+            entity.Property(u => u.ExpiresAt).IsRequired();
+            
+            entity.HasIndex(u => u.ExpiresAt);
         });
     }
 }
