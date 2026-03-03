@@ -283,6 +283,21 @@ public class PredictionsController : ControllerBase
             return BadRequest(new { error = ex.Message });
         }
     }
+
+    [HttpGet("groups/{groupId}/wildcards")]
+    public async Task<IActionResult> GetAllWildcards(int groupId)
+    {
+        try
+        {
+            var userId = GetUserId();
+            var predictions = await _predictionService.GetAllWildcardsAsync(groupId, userId);
+            return Ok(predictions);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
 }
 
 public record DriverDraftRequest(string? Driver1Id, string? Driver2Id);

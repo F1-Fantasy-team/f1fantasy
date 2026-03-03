@@ -328,4 +328,15 @@ public class PredictionService
     {
         return await _predictionRepository.GetWildcardAsync(groupId, userId);
     }
+
+    public async Task<List<WildcardPrediction>> GetAllWildcardsAsync(int groupId, string userId)
+    {
+        // Verify user is a member of the group
+        if (!await _groupRepository.IsUserMemberAsync(groupId, userId))
+        {
+            throw new UnauthorizedAccessException("User is not a member of this group");
+        }
+
+        return await _predictionRepository.GetAllWildcardsAsync(groupId);
+    }
 }
