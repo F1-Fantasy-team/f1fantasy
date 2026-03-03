@@ -113,6 +113,14 @@ public class DriverRepository
             await _context.SaveChangesAsync();
             _logger.LogInformation("Batch processed {Total} drivers: {Added} added, {Updated} updated", 
                 driverList.Count, addedCount, updatedCount);
+            
+            // Log a sample to verify ActiveSeasons
+            var sampleDriver = driverList.FirstOrDefault();
+            if (sampleDriver != null)
+            {
+                _logger.LogInformation("Sample driver {DriverId} has ActiveSeasons: [{Seasons}]", 
+                    sampleDriver.DriverId, string.Join(", ", sampleDriver.ActiveSeasons));
+            }
         }
         catch (Exception ex)
         {
@@ -156,13 +164,29 @@ public class DriverRepository
             // Use current year if season not specified
             season ??= DateTime.UtcNow.Year.ToString();
             
+            _logger.LogInformation("[GetActiveDriversAsync] Querying for active drivers in season {Season}", season);
+            
             // Get drivers that have the season in their ActiveSeasons list
             var activeDrivers = await _context.Drivers
+                .AsNoTracking()
                 .Where(d => d.ActiveSeasons.Contains(season))
                 .OrderBy(d => d.FamilyName)
                 .ToListAsync();
             
-            _logger.LogDebug("Retrieved {Count} active drivers for season {Season}", activeDrivers.Count, season);
+            _logger.LogInformation("[GetActiveDriversAsync] Found {Count} active drivers for season {Season}", activeDrivers.Count, season);
+            
+            // Debug: Check total drivers in DB
+            var totalDrivers = await _context.Drivers.AsNoTracking().CountAsync();
+            _logger.LogInformation("[GetActiveDriversAsync] Total drivers in database: {Total}", totalDrivers);
+            
+            // Debug: Sample a driver to see their ActiveSeasons
+            var sampleDriver = await _context.Drivers.AsNoTracking().FirstOrDefaultAsync();
+            if (sampleDriver != null)
+            {
+                _logger.LogInformation("[GetActiveDriversAsync] Sample driver {DriverId} has ActiveSeasons: [{Seasons}]", 
+                    sampleDriver.DriverId, string.Join(", ", sampleDriver.ActiveSeasons));
+            }
+            
             return activeDrivers;
         }
         catch (Exception ex)
