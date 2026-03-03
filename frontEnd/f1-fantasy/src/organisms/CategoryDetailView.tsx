@@ -57,34 +57,40 @@ function EveryoneDriversTable({ data, currentUserId, drivers }: { data: GroupPre
       <table className="w-full min-w-[320px] text-sm">
         <thead>
           <tr className="border-b border-f1-gray bg-f1-gray/30 text-left text-f1-silver/90">
-            <th className="sticky left-0 z-10 min-w-[2.5rem] bg-f1-gray/30 py-2 pr-2 font-medium sm:pr-4">Pos</th>
-            {ordered.map((u) => (
+            <th className="sticky left-0 z-10 min-w-10 bg-f1-gray/30 py-2 pr-2 font-medium sm:pr-4">Pos</th>
+            {ordered.map((u) => {
+              const headerName = getFirstName((u.displayName && u.displayName.trim().length > 0) ? u.displayName : u.userId);
+              return (
               <th
                 key={u.userId}
-                className={`min-w-[6rem] whitespace-nowrap py-2 pr-3 font-medium sm:pr-4 ${u.userId === currentUserId ? "sticky z-10 bg-f1-gray/30 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.3)]" : ""}`}
+                className={`min-w-24 whitespace-nowrap py-2 pr-3 font-medium sm:pr-4 ${u.userId === currentUserId ? "sticky z-10 bg-f1-gray/30 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.3)]" : ""}`}
                 style={u.userId === currentUserId ? { left: POS_COL_WIDTH } : undefined}
               >
-                <span className="block truncate max-w-[5rem] sm:max-w-none">{getFirstName(u.displayName)}{u.userId === currentUserId ? " (you)" : ""}</span>
+                <span className="block truncate max-w-20 sm:max-w-none">
+                  {headerName}
+                  {u.userId === currentUserId ? " (you)" : ""}
+                </span>
                 {getScore(data, u.userId, "driversChampionship") !== undefined && (
                   <span className="ml-1 text-xs font-mono text-f1-gold">
                     {getScore(data, u.userId, "driversChampionship")} pts
                   </span>
                 )}
               </th>
-            ))}
+            );
+            })}
           </tr>
         </thead>
         <tbody>
           {positions.map((pos) => (
             <tr key={pos} className="border-b border-f1-gray/50">
-              <td className="sticky left-0 z-10 min-w-[2.5rem] bg-f1-carbon py-1.5 pr-2 tabular-nums text-f1-silver/80 sm:pr-4">{pos}</td>
+              <td className="sticky left-0 z-10 min-w-10 bg-f1-carbon py-1.5 pr-2 tabular-nums text-f1-silver/80 sm:pr-4">{pos}</td>
               {ordered.map((u) => {
                 const entry = (u.driversChampionship ?? []).find((e) => e.position === pos);
                 const name = entry ? getDriverName(entry.driverId, drivers) : "—";
                 return (
                   <td
                     key={u.userId}
-                    className={`min-w-[6rem] py-1.5 pr-3 text-f1-silver sm:pr-4 ${u.userId === currentUserId ? "sticky z-10 bg-f1-carbon font-medium shadow-[2px_0_4px_-2px_rgba(0,0,0,0.3)]" : ""}`}
+                    className={`min-w-24 py-1.5 pr-3 text-f1-silver sm:pr-4 ${u.userId === currentUserId ? "sticky z-10 bg-f1-carbon font-medium shadow-[2px_0_4px_-2px_rgba(0,0,0,0.3)]" : ""}`}
                     style={u.userId === currentUserId ? { left: POS_COL_WIDTH } : undefined}
                   >
                     {name}
@@ -110,34 +116,40 @@ function EveryoneConstructorsTable({ data, currentUserId, constructors }: { data
       <table className="w-full min-w-[320px] text-sm">
         <thead>
           <tr className="border-b border-f1-gray bg-f1-gray/30 text-left text-f1-silver/90">
-            <th className="sticky left-0 z-10 min-w-[2.5rem] bg-f1-gray/30 py-2 pr-2 font-medium sm:pr-4">Pos</th>
-            {ordered.map((u) => (
+            <th className="sticky left-0 z-10 min-w-10 bg-f1-gray/30 py-2 pr-2 font-medium sm:pr-4">Pos</th>
+            {ordered.map((u) => {
+              const headerName = getFirstName((u.displayName && u.displayName.trim().length > 0) ? u.displayName : u.userId);
+              return (
               <th
                 key={u.userId}
-                className={`min-w-[6rem] whitespace-nowrap py-2 pr-3 font-medium sm:pr-4 ${u.userId === currentUserId ? "sticky z-10 bg-f1-gray/30 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.3)]" : ""}`}
+                className={`min-w-24 whitespace-nowrap py-2 pr-3 font-medium sm:pr-4 ${u.userId === currentUserId ? "sticky z-10 bg-f1-gray/30 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.3)]" : ""}`}
                 style={u.userId === currentUserId ? { left: POS_COL_WIDTH } : undefined}
               >
-                <span className="block max-w-[5rem] truncate sm:max-w-none">{getFirstName(u.displayName)}{u.userId === currentUserId ? " (you)" : ""}</span>
+                <span className="block max-w-20 truncate sm:max-w-none">
+                  {headerName}
+                  {u.userId === currentUserId ? " (you)" : ""}
+                </span>
                 {getScore(data, u.userId, "constructorsChampionship") !== undefined && (
                   <span className="ml-1 text-xs font-mono text-f1-gold">
                     {getScore(data, u.userId, "constructorsChampionship")} pts
                   </span>
                 )}
               </th>
-            ))}
+            );
+            })}
           </tr>
         </thead>
         <tbody>
           {positions.map((pos) => (
             <tr key={pos} className="border-b border-f1-gray/50">
-              <td className="sticky left-0 z-10 min-w-[2.5rem] bg-f1-carbon py-1.5 pr-2 tabular-nums text-f1-silver/80 sm:pr-4">{pos}</td>
+              <td className="sticky left-0 z-10 min-w-10 bg-f1-carbon py-1.5 pr-2 tabular-nums text-f1-silver/80 sm:pr-4">{pos}</td>
               {ordered.map((u) => {
                 const entry = (u.constructorsChampionship ?? []).find((e) => e.position === pos);
                 const name = entry ? getConstructorName(entry.constructorId, constructors) : "—";
                 return (
                   <td
                     key={u.userId}
-                    className={`min-w-[6rem] py-1.5 pr-3 text-f1-silver sm:pr-4 ${u.userId === currentUserId ? "sticky z-10 bg-f1-carbon font-medium shadow-[2px_0_4px_-2px_rgba(0,0,0,0.3)]" : ""}`}
+                    className={`min-w-24 py-1.5 pr-3 text-f1-silver sm:pr-4 ${u.userId === currentUserId ? "sticky z-10 bg-f1-carbon font-medium shadow-[2px_0_4px_-2px_rgba(0,0,0,0.3)]" : ""}`}
                     style={u.userId === currentUserId ? { left: POS_COL_WIDTH } : undefined}
                   >
                     {name}
@@ -319,7 +331,7 @@ export function CategoryDetailView({ group, categoryId, data, setData, currentUs
       </F1Button>
 
       <div className="min-w-0">
-        <F1Title level={3} className="!mb-1 !break-words !text-xl sm:!text-2xl">
+        <F1Title level={3} className="mb-1! wrap-break-word! text-xl! sm:text-2xl!">
           {CATEGORY_LABELS[categoryId]}
         </F1Title>
         <F1Text muted className="block">
@@ -331,12 +343,12 @@ export function CategoryDetailView({ group, categoryId, data, setData, currentUs
         {isLocked ? (
           <div className="relative mb-4 overflow-hidden rounded-lg border border-f1-gray bg-f1-carbon/80">
             <div className="flex items-center justify-between gap-3 px-4 py-3">
-              <F1Title level={5} className="!mb-0">
+              <F1Title level={5} className="mb-0!">
                 Your prediction
               </F1Title>
               <span className="text-sm text-f1-silver/90">Predictions are locked</span>
             </div>
-            <div className="pointer-events-none h-24 overflow-hidden bg-gradient-to-b from-f1-carbon to-transparent px-4 pb-4 pt-0">
+            <div className="pointer-events-none h-24 overflow-hidden bg-linear-to-b from-f1-carbon to-transparent px-4 pb-4 pt-0">
               <div className="text-xs text-f1-silver/60">
                 <PredictionContent predictions={myPredictions} categoryId={categoryId} drivers={drivers} constructors={constructors} />
               </div>
@@ -344,10 +356,10 @@ export function CategoryDetailView({ group, categoryId, data, setData, currentUs
           </div>
         ) : (
           <>
-            <F1Title level={5} className="!mb-2">
+            <F1Title level={5} className="mb-2!">
               Your prediction
             </F1Title>
-            <F1Card className="mb-4 !rounded-lg">
+            <F1Card className="mb-4 rounded-lg!">
               {categoryId === "driversChampionship" ? (
                 <DriversChampionshipEditor
                   value={myPredictions?.driversChampionship}
@@ -398,7 +410,7 @@ export function CategoryDetailView({ group, categoryId, data, setData, currentUs
       </section>
 
       <section>
-        <F1Title level={5} className="!mb-2">
+        <F1Title level={5} className="mb-2!">
           Everyone&apos;s predictions
         </F1Title>
         {categoryId === "driversChampionship" ? (
@@ -421,10 +433,14 @@ export function CategoryDetailView({ group, categoryId, data, setData, currentUs
                 .find((s) => s.userId === userPrediction.userId)
                 ?.categoryScores.find((c) => c.categoryId === "wildcard")?.score;
               return (
-                <F1Card key={userPrediction.userId} className="!rounded-lg">
+                <F1Card key={userPrediction.userId} className="rounded-lg!">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <F1Text className={userPrediction.userId === currentUserId ? "text-f1-red font-medium" : ""}>
-                      {getFirstName(userPrediction.displayName)}
+                      {getFirstName(
+                        (userPrediction.displayName && userPrediction.displayName.trim().length > 0)
+                          ? userPrediction.displayName
+                          : userPrediction.userId
+                      )}
                       {userPrediction.userId === currentUserId ? " (you)" : ""}
                     </F1Text>
                     {score !== undefined && (
@@ -466,10 +482,14 @@ export function CategoryDetailView({ group, categoryId, data, setData, currentUs
         ) : (
           <div className="flex flex-col gap-4">
             {data.predictions.map((userPrediction) => (
-              <F1Card key={userPrediction.userId} className="!rounded-lg">
+              <F1Card key={userPrediction.userId} className="rounded-lg!">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <F1Text className={userPrediction.userId === currentUserId ? "text-f1-red font-medium" : ""}>
-                    {getFirstName(userPrediction.displayName)}
+                    {getFirstName(
+                      (userPrediction.displayName && userPrediction.displayName.trim().length > 0)
+                        ? userPrediction.displayName
+                        : userPrediction.userId
+                    )}
                     {userPrediction.userId === currentUserId ? " (you)" : ""}
                   </F1Text>
                   {data.standings
