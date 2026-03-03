@@ -51,7 +51,7 @@ GET /api/groups
 Authorization: Bearer YOUR_TOKEN
 ```
 
-Response: Array of groups you're a member of, with enriched member data
+Response: **Lightweight** array of groups you're a member of. No display names or predictions - optimized for fast list views.
 
 ```json
 [
@@ -69,22 +69,20 @@ Response: Array of groups you're a member of, with enriched member data
         "id": 1,
         "groupId": 1,
         "userId": "user_xxx",
-        "displayName": "John Doe",
-        "isAdmin": true,
         "joinedAt": "2025-02-22T14:00:00Z"
       },
       {
         "id": 2,
         "groupId": 1,
         "userId": "user_yyy",
-        "displayName": "Jane Smith",
-        "isAdmin": false,
         "joinedAt": "2025-02-22T15:30:00Z"
       }
     ]
   }
 ]
 ```
+
+**Note**: This endpoint returns basic group info only. For display names and predictions, use `GET /api/groups/{id}`.
 
 ### 3. Get Specific Group by ID
 ```http

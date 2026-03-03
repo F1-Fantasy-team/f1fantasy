@@ -62,12 +62,9 @@ public class GroupsController : ControllerBase
             var groups = await _groupService.GetUserGroupsAsync(userId);
             _logger.LogInformation("[GetMyGroups] After GetUserGroupsAsync - GroupCount: {Count} - Elapsed: {Elapsed}ms", groups.Count, stopwatch.ElapsedMilliseconds);
             
-            var groupDtos = await EnrichGroupsWithMemberNamesAsync(groups);
-            _logger.LogInformation("[GetMyGroups] After EnrichGroupsWithMemberNamesAsync - Elapsed: {Elapsed}ms", stopwatch.ElapsedMilliseconds);
-            
             stopwatch.Stop();
             _logger.LogInformation("[GetMyGroups] Complete - Total: {Total}ms", stopwatch.ElapsedMilliseconds);
-            return Ok(groupDtos);
+            return Ok(groups);
         }
         catch (Exception ex)
         {
