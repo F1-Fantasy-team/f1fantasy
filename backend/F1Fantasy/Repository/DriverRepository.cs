@@ -24,7 +24,24 @@ public class DriverRepository
             if (existing != null)
             {
                 _logger.LogDebug("Updating existing driver: {DriverId}", driver.DriverId);
-                _context.Entry(existing).CurrentValues.SetValues(driver);
+                
+                // Update primitive properties
+                existing.PermanentNumber = driver.PermanentNumber;
+                existing.Code = driver.Code;
+                existing.GivenName = driver.GivenName;
+                existing.FamilyName = driver.FamilyName;
+                existing.DateOfBirth = driver.DateOfBirth;
+                existing.Nationality = driver.Nationality;
+                existing.Url = driver.Url;
+                
+                // Merge ActiveSeasons - add any new seasons that aren't already present
+                foreach (var season in driver.ActiveSeasons)
+                {
+                    if (!existing.ActiveSeasons.Contains(season))
+                    {
+                        existing.ActiveSeasons.Add(season);
+                    }
+                }
             }
             else
             {
