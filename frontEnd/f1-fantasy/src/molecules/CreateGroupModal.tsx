@@ -140,7 +140,7 @@ export function CreateGroupModal({ open, onClose, onCreated, createGroup }: Crea
         >
           <Input
             placeholder="e.g. Office Legends"
-            className="h-11 rounded-lg border-f1-gray bg-f1-gray/80 text-f1-silver placeholder:text-f1-silver/50 focus:border-f1-red focus:shadow-[0_0_0_2px_rgba(225,6,0,0.2)] focus:outline-0"
+            className="h-11 rounded-lg border-f1-gray bg-f1-gray/80 text-f1-silver placeholder:text-f1-silver/80 focus:border-f1-red focus:shadow-[0_0_0_2px_rgba(225,6,0,0.2)] focus:outline-0"
             autoFocus
           />
         </Form.Item>
