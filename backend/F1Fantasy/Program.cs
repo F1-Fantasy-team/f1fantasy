@@ -100,6 +100,7 @@ builder.Services.AddDbContext<F1FantasyDbContext>(options =>
 
 // Add services to the container.
 builder.Services.AddHttpClient();
+builder.Services.AddMemoryCache(); // For caching Clerk user data and other frequently accessed data
 builder.Services.AddSingleton<F1Fantasy.Services.PaginationStateTracker>();
 builder.Services.AddScoped<F1Fantasy.Repository.DataFetchMetadataRepository>();
 builder.Services.AddScoped<F1Fantasy.Repository.RaceRepository>();
