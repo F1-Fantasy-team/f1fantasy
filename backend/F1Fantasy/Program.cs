@@ -80,6 +80,14 @@ builder.Services.AddDbContext<F1FantasyDbContext>(options =>
     {
         throw new InvalidOperationException("Database connection string 'DefaultConnection' not found. Please configure it in appsettings.json or environment variables.");
     }
+    
+    // Add connection pooling parameters if not already present
+    if (!connString.Contains("Pooling=", StringComparison.OrdinalIgnoreCase))
+    {
+        var poolingParams = "Pooling=true;Minimum Pool Size=5;Maximum Pool Size=50;Connection Idle Lifetime=300;Connection Pruning Interval=10";
+        connString = connString.TrimEnd(';') + ";" + poolingParams;
+    }
+    
     options.UseNpgsql(connString, npgsqlOptions =>
     {
         // Set command timeout to prevent long-running queries (30 seconds)
@@ -111,6 +119,14 @@ builder.Services.AddDbContextFactory<F1FantasyDbContext>(options =>
     {
         throw new InvalidOperationException("Database connection string 'DefaultConnection' not found. Please configure it in appsettings.json or environment variables.");
     }
+    
+    // Add connection pooling parameters if not already present
+    if (!connString.Contains("Pooling=", StringComparison.OrdinalIgnoreCase))
+    {
+        var poolingParams = "Pooling=true;Minimum Pool Size=5;Maximum Pool Size=50;Connection Idle Lifetime=300;Connection Pruning Interval=10";
+        connString = connString.TrimEnd(';') + ";" + poolingParams;
+    }
+    
     options.UseNpgsql(connString, npgsqlOptions =>
     {
         npgsqlOptions.CommandTimeout(30);
