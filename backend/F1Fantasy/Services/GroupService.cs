@@ -190,8 +190,8 @@ public class GroupService
     private string GenerateInviteCode()
     {
         const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Removed ambiguous chars
-        var random = new Random();
+        // Use Random.Shared for thread-safety and better randomness
         return new string(Enumerable.Repeat(chars, 8)
-            .Select(s => s[random.Next(s.Length)]).ToArray());
+            .Select(s => s[Random.Shared.Next(s.Length)]).ToArray());
     }
 }
