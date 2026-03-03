@@ -18,7 +18,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { HolderOutlined } from "@ant-design/icons";
 import { F1Button, F1Text } from "../atoms";
-import { useConstructors, useConstructorsFromApi } from "../state/useDriversAndConstructors";
+import { useConstructors } from "../state/useDriversAndConstructors";
 import type { ConstructorsChampionshipPrediction } from "../types/predictions";
 
 function SortableConstructorRow({
@@ -63,7 +63,6 @@ type ConstructorsChampionshipEditorProps = {
 
 export function ConstructorsChampionshipEditor({ value, onSave }: ConstructorsChampionshipEditorProps) {
     const constructors = useConstructors();
-    const fromApi = useConstructorsFromApi();
     const sorted = (value ?? []).slice().sort((a, b) => a.position - b.position);
     const existingIds = sorted.map((e) => e.constructorId);
     const missingIds = constructors.map((c) => c.id).filter((id) => !existingIds.includes(id));
