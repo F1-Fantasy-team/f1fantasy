@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useUser } from "@clerk/clerk-react";
 import { App } from "antd";
 import { useRecoilState, useSetRecoilState, useRecoilValue } from "recoil";
@@ -101,6 +101,11 @@ export default function Index() {
   const firstRaceDate = useRecoilValue(firstRaceDateState);
   const appDataLoading = useRecoilValue(appDataLoadingState);
   const selectedGroup = userGroups.find((g) => g.id === selectedGroupId);
+  // Keep a ref so the detail-fetch effect closure can read the latest selectedGroup
+  // without it being a reactive dependency (writing setUserGroups would otherwise
+  // create a new selectedGroup reference → re-trigger the effect → infinite loop).
+  const selectedGroupRef = useRef(selectedGroup);
+  selectedGroupRef.current = selectedGroup;
   const [groupData, setGroupData] = useRecoilState(
     groupPredictionsState(selectedGroupId ?? "_none")
   );
@@ -209,7 +214,7 @@ export default function Index() {
   useEffect(() => {
     if (
       !selectedGroupId ||
-      !selectedGroup ||
+      !selectedGroupRef.current ||
       !getApiBaseUrl() ||
       !isSignedIn
     )
@@ -242,7 +247,7 @@ export default function Index() {
           }
         : null;
 
-      const effectiveGroup = detailedGroup ?? selectedGroup;
+      const effectiveGroup = detailedGroup ?? selectedGroupRef.current!;
 
       if (detailedGroup) {
         setUserGroups((prev) =>
@@ -297,7 +302,6 @@ export default function Index() {
   }, [
     isSignedIn,
     selectedGroupId,
-    selectedGroup,
     selectedGroup?.id,
     selectedGroup?.predictionsLocked,
     currentUserId,
