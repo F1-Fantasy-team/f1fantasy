@@ -67,17 +67,23 @@ public class ConstructorRepository
             {
                 if (existingConstructors.TryGetValue(constructor.ConstructorId, out var existing))
                 {
+                    // Log incoming data for diagnosis
+                    _logger.LogDebug("[AddOrUpdateBatchAsync] Constructor {ConstructorId} incoming ActiveSeasons: [{Seasons}]",
+                        constructor.ConstructorId, string.Join(", ", constructor.ActiveSeasons));
+                    
                     // Update existing constructor
                     existing.Name = constructor.Name;
                     existing.Url = constructor.Url;
                     existing.Nationality = constructor.Nationality;
                     
-                    // Update ActiveSeasons - clear and rebuild to ensure EF Core tracks changes
-                    existing.ActiveSeasons.Clear();
-                    foreach (var season in constructor.ActiveSeasons)
-                    {
-                        existing.ActiveSeasons.Add(season);
-                    }
+                    // Update ActiveSeasons - explicitly mark as modified for EF Core to track PostgreSQL array
+                    existing.ActiveSeasons = constructor.ActiveSeasons.ToList();
+                    _context.Entry(existing).Property(e => e.ActiveSeasons).IsModified = true;
+                    
+                    _logger.LogDebug("[AddOrUpdateBatchAsync] Constructor {ConstructorId} after assignment: [{Seasons}], IsModified: {IsModified}",
+                        constructor.ConstructorId, string.Join(", ", existing.ActiveSeasons),
+                        _context.Entry(existing).Property(e => e.ActiveSeasons).IsModified);
+                    
                     updatedCount++;
                 }
                 else
@@ -92,6 +98,16 @@ public class ConstructorRepository
             await _context.SaveChangesAsync();
             _logger.LogInformation("Batch processed {Total} constructors: {Added} added, {Updated} updated", 
                 constructorList.Count, addedCount, updatedCount);
+            
+            // Verify what was actually written to database
+            var verifyConstructor = await _context.Constructors
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => constructorIds.Contains(c.ConstructorId));
+            if (verifyConstructor != null)
+            {
+                _logger.LogWarning("[AddOrUpdateBatchAsync] POST-SAVE verification: Constructor {ConstructorId} in DB has ActiveSeasons: [{Seasons}]",
+                    verifyConstructor.ConstructorId, string.Join(", ", verifyConstructor.ActiveSeasons));
+            }
             
             // Log a sample to verify ActiveSeasons
             var sampleConstructor = constructorList.FirstOrDefault();
