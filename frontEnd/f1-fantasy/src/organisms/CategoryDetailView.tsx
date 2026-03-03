@@ -15,10 +15,9 @@ import { useDrivers, useConstructors } from "../state/useDriversAndConstructors"
 import { isUserLocked, isGroupAdmin } from "../utils/predictionLock";
 import { getApiBaseUrl } from "../api/client";
 import {
-  fetchAdminWildcardsFromApi,
+  fetchAllWildcardsFromApi,
   putAdminWildcardPointsFromApi,
   putAdminWildcardFulfilledFromApi,
-  type AdminWildcardApi,
 } from "../api/predictions";
 import type { Group } from "../types/group";
 import type { PredictionCategoryId } from "../types/predictions";
@@ -176,7 +175,7 @@ type CategoryDetailViewProps = {
 
 export function CategoryDetailView({ group, categoryId, data, setData, currentUserId, onSavePrediction }: CategoryDetailViewProps) {
   const { message } = App.useApp();
-  const [, setAdminWildcards] = useState<AdminWildcardApi[] | null>(null);
+  const [, setWildcards] = useState<unknown | null>(null);
   const setSelectedCategoryId = useSetRecoilState(selectedCategoryIdState);
   const firstRaceDateFromRaces = useRecoilValue(firstRaceDateState);
   const drivers = useDrivers();
@@ -184,16 +183,53 @@ export function CategoryDetailView({ group, categoryId, data, setData, currentUs
   const isAdmin = isGroupAdmin(group, currentUserId);
 
   useEffect(() => {
-    if (
-      categoryId === "wildcard" &&
-      isAdmin &&
-      getApiBaseUrl()
-    ) {
-      fetchAdminWildcardsFromApi(group.id).then(setAdminWildcards);
-    } else {
-      setAdminWildcards(null);
+    if (categoryId !== "wildcard" || !getApiBaseUrl()) {
+      return;
     }
-  }, [categoryId, group.id, isAdmin]);
+
+    fetchAllWildcardsFromApi(group.id).then((list) => {
+      setWildcards(list);
+      if (!list || !Array.isArray(list) || list.length === 0) return;
+
+      // Merge group wildcards into predictions so "Everyone's predictions"
+      // shows wildcard statements for all members that have one.
+      setData((prev) => {
+        const byUserId = new Map(
+          prev.predictions.map((p) => [p.userId, p] as const)
+        );
+
+        for (const w of list as Array<{
+          userId: string;
+          statement: string;
+          pointsPotential?: number;
+          fulfilled?: boolean;
+          fullfilled?: boolean;
+        }>) {
+          const existing = byUserId.get(w.userId);
+          const member = group.members?.find((m) => m.userId === w.userId);
+          const displayName =
+            existing?.displayName ??
+            member?.displayName ??
+            w.userId;
+
+          byUserId.set(w.userId, {
+            ...(existing ?? { userId: w.userId, displayName }),
+            wildcard: {
+              statement: w.statement,
+              pointsPotential: w.pointsPotential,
+              // Backend historically used both "fulfilled" and "fullfilled"; support both.
+              fulfilled: w.fulfilled ?? w.fullfilled,
+            },
+          });
+        }
+
+        return {
+          ...prev,
+          predictions: Array.from(byUserId.values()),
+        };
+      });
+    });
+  }, [categoryId, group.id, group.members, setData]);
 
   const myPredictions = data.predictions.find((p) => p.userId === currentUserId);
   const isLocked = isUserLocked(group, data, currentUserId, firstRaceDateFromRaces);
