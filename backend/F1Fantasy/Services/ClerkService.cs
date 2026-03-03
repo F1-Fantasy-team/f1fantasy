@@ -13,15 +13,15 @@ public class ClerkService
     private readonly ClerkBackendApi _clerkClient;
     private readonly ILogger<ClerkService> _logger;
     private readonly IMemoryCache _cache;
-    private readonly F1FantasyDbContext _context;
+    private readonly IDbContextFactory<F1FantasyDbContext> _contextFactory;
     private static readonly TimeSpan CacheDuration = TimeSpan.FromDays(7); // Database cache lasts 7 days
     private static readonly TimeSpan MemoryCacheDuration = TimeSpan.FromMinutes(30); // Memory cache lasts 30 minutes
 
-    public ClerkService(ILogger<ClerkService> logger, IMemoryCache cache, F1FantasyDbContext context)
+    public ClerkService(ILogger<ClerkService> logger, IMemoryCache cache, IDbContextFactory<F1FantasyDbContext> contextFactory)
     {
         _logger = logger;
         _cache = cache;
-        _context = context;
+        _contextFactory = contextFactory;
         var clerkSecretKey = Environment.GetEnvironmentVariable("CLERK_SECRET_KEY");
         
         if (string.IsNullOrEmpty(clerkSecretKey))
@@ -51,7 +51,8 @@ public class ClerkService
         // Try to get from database cache (still fast) - handle gracefully if table doesn't exist
         try
         {
-            var dbCache = await _context.UserDisplayNameCache
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var dbCache = await context.UserDisplayNameCache
                 .AsNoTracking()
                 .FirstOrDefaultAsync(u => u.UserId == userId);
                 
@@ -111,9 +112,14 @@ public class ClerkService
             {
                 _logger.LogWarning("[GetUserDisplayNameAsync] No name or username found for user {UserId}, using ID as display name", userId);
                 displayName = userId;
+                // Cache userId fallbacks for shorter time (1 hour) in case user updates their profile
+                await UpdateCacheAsync(userId, displayName, TimeSpan.FromHours(1));
+                stopwatch.Stop();
+                _logger.LogInformation("[GetUserDisplayNameAsync] Fetched from Clerk API - UserId: {UserId}, DisplayName: {DisplayName} (fallback), Total: {Elapsed}ms", userId, displayName, stopwatch.ElapsedMilliseconds);
+                return displayName;
             }
 
-            // Update both caches
+            // Update both caches with standard duration
             await UpdateCacheAsync(userId, displayName);
             stopwatch.Stop();
             _logger.LogInformation("[GetUserDisplayNameAsync] Fetched from Clerk API - UserId: {UserId}, DisplayName: {DisplayName}, Total: {Elapsed}ms", userId, displayName, stopwatch.ElapsedMilliseconds);
@@ -139,25 +145,33 @@ public class ClerkService
         _cache.Set($"clerk_user_{userId}", displayName, duration ?? MemoryCacheDuration);
         
         // Update database cache
-        var existingCache = await _context.UserDisplayNameCache.FindAsync(userId);
-        if (existingCache != null)
+        try
         {
-            existingCache.DisplayName = displayName;
-            existingCache.CachedAt = now;
-            existingCache.ExpiresAt = expiresAt;
-        }
-        else
-        {
-            _context.UserDisplayNameCache.Add(new UserDisplayNameCache
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var existingCache = await context.UserDisplayNameCache.FindAsync(userId);
+            if (existingCache != null)
             {
-                UserId = userId,
-                DisplayName = displayName,
-                CachedAt = now,
-                ExpiresAt = expiresAt
-            });
+                existingCache.DisplayName = displayName;
+                existingCache.CachedAt = now;
+                existingCache.ExpiresAt = expiresAt;
+            }
+            else
+            {
+                context.UserDisplayNameCache.Add(new UserDisplayNameCache
+                {
+                    UserId = userId,
+                    DisplayName = displayName,
+                    CachedAt = now,
+                    ExpiresAt = expiresAt
+                });
+            }
+            
+            await context.SaveChangesAsync();
         }
-        
-        await _context.SaveChangesAsync();
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[UpdateCacheAsync] Failed to update database cache for UserId: {UserId}", userId);
+        }
     }
 
     /// <summary>
@@ -176,7 +190,8 @@ public class ClerkService
         List<UserDisplayNameCache> cachedUsers;
         try
         {
-            cachedUsers = await _context.UserDisplayNameCache
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            cachedUsers = await context.UserDisplayNameCache
                 .AsNoTracking()
                 .Where(u => uniqueUserIds.Contains(u.UserId) && u.ExpiresAt > DateTime.UtcNow)
                 .ToListAsync();
