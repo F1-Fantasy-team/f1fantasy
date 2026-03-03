@@ -28,9 +28,22 @@ Response:
   "lockMode": "admin",
   "adminUserId": "user_xxx",
   "predictionsLocked": false,
-  "createdAt": "2025-02-22T14:00:00Z"
+  "lockedAt": null,
+  "createdAt": "2025-02-22T14:00:00Z",
+  "members": [
+    {
+      "id": 1,
+      "groupId": 1,
+      "userId": "user_xxx",
+      "displayName": "John Doe",
+      "isAdmin": true,
+      "joinedAt": "2025-02-22T14:00:00Z"
+    }
+  ]
 }
 ```
+
+**Note**: `displayName` is fetched from Clerk (name or username fallback). Admin is auto-added as first member.
 
 ### 2. Get My Groups
 ```http
@@ -38,7 +51,40 @@ GET /api/groups
 Authorization: Bearer YOUR_TOKEN
 ```
 
-Response: Array of groups you're a member of
+Response: Array of groups you're a member of, with enriched member data
+
+```json
+[
+  {
+    "id": 1,
+    "name": "My F1 Fantasy League",
+    "inviteCode": "ABC12XYZ",
+    "lockMode": "admin",
+    "adminUserId": "user_xxx",
+    "predictionsLocked": false,
+    "lockedAt": null,
+    "createdAt": "2025-02-22T14:00:00Z",
+    "members": [
+      {
+        "id": 1,
+        "groupId": 1,
+        "userId": "user_xxx",
+        "displayName": "John Doe",
+        "isAdmin": true,
+        "joinedAt": "2025-02-22T14:00:00Z"
+      },
+      {
+        "id": 2,
+        "groupId": 1,
+        "userId": "user_yyy",
+        "displayName": "Jane Smith",
+        "isAdmin": false,
+        "joinedAt": "2025-02-22T15:30:00Z"
+      }
+    ]
+  }
+]
+```
 
 ### 3. Get Specific Group by ID
 ```http
@@ -46,13 +92,15 @@ GET /api/groups/1
 Authorization: Bearer YOUR_TOKEN
 ```
 
+Response: Group details with all members and their display names from Clerk
+
 ### 4. Get Group by Invite Code
 ```http
 GET /api/groups/invite/ABC12XYZ
 Authorization: Bearer YOUR_TOKEN
 ```
 
-Response: Group details (useful for preview before joining)
+Response: Group details with members and display names (useful for preview before joining)
 
 ### 5. Join a Group
 ```http
@@ -556,6 +604,42 @@ Response:
 - **Constructor Championship**: 10 points exact match, -2 per position delta for ALL constructors
 - **Zero Pointers**: +100 per correct prediction (driver has 0 points), -20 per incorrect (driver has points)
 - **Wildcard**: 100-200 points (admin sets amount and marks fulfilled)
+
+## Response Formats
+
+### Group Response (GroupDto)
+
+All GET endpoints for groups return enriched `GroupDto` objects with member display names fetched from Clerk:
+
+```json
+{
+  "id": 1,
+  "name": "My F1 Fantasy League",
+  "inviteCode": "ABC12XYZ",
+  "lockMode": "admin",
+  "adminUserId": "user_xxx",
+  "createdAt": "2025-02-22T14:00:00Z",
+  "predictionsLocked": false,
+  "lockedAt": null,
+  "members": [
+    {
+      "id": 1,
+      "groupId": 1,
+      "userId": "user_xxx",
+      "displayName": "John Doe",
+      "isAdmin": true,
+      "joinedAt": "2025-02-22T14:00:00Z"
+    }
+  ]
+}
+```
+
+**Member Fields:**
+- `displayName`: First name + last name from Clerk, falls back to username, then user ID
+- `isAdmin`: Boolean indicating if this member is the group admin
+- All other fields are standard group/member data
+
+**Performance Note:** Display names are fetched in parallel from Clerk API for efficiency. Falls back gracefully to user IDs if Clerk API is unavailable.
 
 ## Request Formats
 
