@@ -19,7 +19,19 @@ public class ConstructorRepository
         
         if (existing != null)
         {
-            _context.Entry(existing).CurrentValues.SetValues(constructor);
+            // Update primitive properties
+            existing.Name = constructor.Name;
+            existing.Url = constructor.Url;
+            existing.Nationality = constructor.Nationality;
+            
+            // Merge ActiveSeasons - add any new seasons that aren't already present
+            foreach (var season in constructor.ActiveSeasons)
+            {
+                if (!existing.ActiveSeasons.Contains(season))
+                {
+                    existing.ActiveSeasons.Add(season);
+                }
+            }
         }
         else
         {
