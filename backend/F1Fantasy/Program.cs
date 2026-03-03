@@ -81,12 +81,18 @@ builder.Services.AddDbContext<F1FantasyDbContext>(options =>
         throw new InvalidOperationException("Database connection string 'DefaultConnection' not found. Please configure it in appsettings.json or environment variables.");
     }
     
-    // Add connection pooling parameters if not already present
-    if (!connString.Contains("Pooling=", StringComparison.OrdinalIgnoreCase))
-    {
-        var poolingParams = "Pooling=true;Minimum Pool Size=5;Maximum Pool Size=50;Connection Idle Lifetime=300;Connection Pruning Interval=10";
-        connString = connString.TrimEnd(';') + ";" + poolingParams;
-    }
+    // Force optimal connection pooling parameters
+    // Remove any existing pooling params and add our own
+    connString = System.Text.RegularExpressions.Regex.Replace(
+        connString, 
+        @"(Pooling|Minimum Pool Size|Maximum Pool Size|Connection Idle Lifetime|Connection Pruning Interval)\s*=\s*[^;]*;?", 
+        "", 
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    
+    var poolingParams = "Pooling=true;Minimum Pool Size=10;Maximum Pool Size=100;Connection Idle Lifetime=60;Connection Pruning Interval=5";
+    connString = connString.TrimEnd(';') + ";" + poolingParams;
+    
+    builder.Logging.LogInformation("Database connection with pooling: Min=10, Max=100, IdleLifetime=60s");
     
     options.UseNpgsql(connString, npgsqlOptions =>
     {
@@ -120,12 +126,15 @@ builder.Services.AddDbContextFactory<F1FantasyDbContext>(options =>
         throw new InvalidOperationException("Database connection string 'DefaultConnection' not found. Please configure it in appsettings.json or environment variables.");
     }
     
-    // Add connection pooling parameters if not already present
-    if (!connString.Contains("Pooling=", StringComparison.OrdinalIgnoreCase))
-    {
-        var poolingParams = "Pooling=true;Minimum Pool Size=5;Maximum Pool Size=50;Connection Idle Lifetime=300;Connection Pruning Interval=10";
-        connString = connString.TrimEnd(';') + ";" + poolingParams;
-    }
+    // Force optimal connection pooling parameters
+    connString = System.Text.RegularExpressions.Regex.Replace(
+        connString, 
+        @"(Pooling|Minimum Pool Size|Maximum Pool Size|Connection Idle Lifetime|Connection Pruning Interval)\s*=\s*[^;]*;?", 
+        "", 
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    
+    var poolingParams = "Pooling=true;Minimum Pool Size=10;Maximum Pool Size=100;Connection Idle Lifetime=60;Connection Pruning Interval=5";
+    connString = connString.TrimEnd(';') + ";" + poolingParams;
     
     options.UseNpgsql(connString, npgsqlOptions =>
     {
@@ -444,5 +453,22 @@ var logger = app.Services.GetRequiredService<ILogger<Program>>();
 logger.LogInformation("F1Fantasy API starting up...");
 logger.LogInformation("Environment: {Environment}", app.Environment.EnvironmentName);
 logger.LogInformation("Listening on port: {Port}", port);
+
+// Prewarm database connection pool
+logger.LogInformation("Prewarming database connection pool...");
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<F1FantasyDbContext>();
+    try
+    {
+        // Execute a simple query to open initial connections in the pool
+        var canConnect = await dbContext.Database.CanConnectAsync();
+        logger.LogInformation("Database connection pool prewarmed successfully. CanConnect: {CanConnect}", canConnect);
+    }
+    catch (Exception ex)
+    {
+        logger.LogWarning(ex, "Failed to prewarm database connection pool: {Message}", ex.Message);
+    }
+}
 
 app.Run();
