@@ -165,42 +165,52 @@ builder.Services.AddSingleton<RateLimitViolationMonitor>();
 builder.Services.AddHostedService<F1Fantasy.Services.AutoLockService>();
 
 // Configure Clerk JWT Authentication
-var clerkSecretKey = Environment.GetEnvironmentVariable("CLERK_SECRET_KEY");
-if (string.IsNullOrEmpty(clerkSecretKey))
-{
-    throw new InvalidOperationException("CLERK_SECRET_KEY environment variable is not set. Please configure it in .env file.");
-}
+// Accept tokens from multiple Clerk instances based on environment
+var clerkUrls = builder.Environment.IsDevelopment()
+    ? new[]
+    {
+        "https://clerk.f1fantasy.no",              // Production
+        "https://above-stag-28.clerk.accounts.dev" // Development
+    }
+    : new[]
+    {
+        "https://clerk.f1fantasy.no"               // Production only
+    };
 
-// OPTION 2: Accept tokens from MULTIPLE Clerk instances (Dev + Prod)
-// This requires custom configuration manager to fetch signing keys from both instances
-var clerkUrls = new[]
+// Register MultiClerkConfigurationManager as singleton using DI
+builder.Services.AddSingleton<F1Fantasy.Services.MultiClerkConfigurationManager>(sp =>
 {
-    "https://clerk.f1fantasy.no",              // Production
-    "https://above-stag-28.clerk.accounts.dev" // Development
-};
-
-// Create custom configuration manager that merges keys from both Clerk instances
-var httpClient = new HttpClient();
-using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
-var configLogger = loggerFactory.CreateLogger<F1Fantasy.Services.MultiClerkConfigurationManager>();
-var multiClerkConfigManager = new F1Fantasy.Services.MultiClerkConfigurationManager(
-    clerkUrls, 
-    httpClient,
-    configLogger
-);
+    var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
+    var logger = sp.GetRequiredService<ILogger<F1Fantasy.Services.MultiClerkConfigurationManager>>();
+    var httpClient = httpClientFactory.CreateClient("ClerkConfiguration");
+    
+    // Configure timeout for OIDC configuration requests
+    httpClient.Timeout = TimeSpan.FromSeconds(30);
+    
+    return new F1Fantasy.Services.MultiClerkConfigurationManager(
+        clerkUrls,
+        httpClient,
+        logger
+    );
+});
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        // Use custom configuration manager instead of Authority
-        options.ConfigurationManager = multiClerkConfigManager;
+        // Use custom configuration manager from DI
+        var configManager = builder.Services.BuildServiceProvider().GetRequiredService<F1Fantasy.Services.MultiClerkConfigurationManager>();
+        options.ConfigurationManager = configManager;
         options.RequireHttpsMetadata = true;
+
+        // Pre-fetch configuration to get valid issuers
+        var configuration = configManager.GetConfigurationAsync(CancellationToken.None).GetAwaiter().GetResult();
+        var validIssuers = configManager.GetValidIssuers();
 
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
-            // Accept tokens from BOTH Clerk instances
-            ValidIssuers = clerkUrls,
+            // Use issuers derived from discovery documents (normalized)
+            ValidIssuers = validIssuers,
             ValidateAudience = false,  // Clerk doesn't use audience validation
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
