@@ -1,5 +1,6 @@
 using Clerk.BackendAPI;
 using Clerk.BackendAPI.Models.Operations;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace F1Fantasy.Services;
 
@@ -7,10 +8,13 @@ public class ClerkService
 {
     private readonly ClerkBackendApi _clerkClient;
     private readonly ILogger<ClerkService> _logger;
+    private readonly IMemoryCache _cache;
+    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(30);
 
-    public ClerkService(ILogger<ClerkService> logger)
+    public ClerkService(ILogger<ClerkService> logger, IMemoryCache cache)
     {
         _logger = logger;
+        _cache = cache;
         var clerkSecretKey = Environment.GetEnvironmentVariable("CLERK_SECRET_KEY");
         
         if (string.IsNullOrEmpty(clerkSecretKey))
@@ -23,10 +27,17 @@ public class ClerkService
 
     /// <summary>
     /// Fetches user display name from Clerk. Returns first name + last name if available, otherwise username.
-    /// Falls back to the user ID if all else fails.
+    /// Falls back to the user ID if all else fails. Results are cached for improved performance.
     /// </summary>
     public async Task<string> GetUserDisplayNameAsync(string userId)
     {
+        // Try to get from cache first
+        var cacheKey = $"clerk_user_{userId}";
+        if (_cache.TryGetValue<string>(cacheKey, out var cachedName) && cachedName != null)
+        {
+            return cachedName;
+        }
+
         try
         {
             var response = await _clerkClient.Users.GetAsync(userId);
@@ -34,7 +45,9 @@ public class ClerkService
             if (response?.User == null)
             {
                 _logger.LogWarning("User {UserId} not found in Clerk", userId);
-                return userId; // Fallback to user ID
+                var fallbackId = userId;
+                _cache.Set(cacheKey, fallbackId, CacheDuration);
+                return fallbackId;
             }
 
             var user = response.User;
@@ -43,33 +56,40 @@ public class ClerkService
             var firstName = user.FirstName?.Trim();
             var lastName = user.LastName?.Trim();
 
+            string displayName;
             if (!string.IsNullOrEmpty(firstName) && !string.IsNullOrEmpty(lastName))
             {
-                return $"{firstName} {lastName}";
+                displayName = $"{firstName} {lastName}";
             }
             else if (!string.IsNullOrEmpty(firstName))
             {
-                return firstName;
+                displayName = firstName;
             }
             else if (!string.IsNullOrEmpty(lastName))
             {
-                return lastName;
+                displayName = lastName;
             }
-
-            // Fallback to username
-            if (!string.IsNullOrEmpty(user.Username))
+            else if (!string.IsNullOrEmpty(user.Username))
             {
-                return user.Username;
+                displayName = user.Username;
+            }
+            else
+            {
+                _logger.LogWarning("No name or username found for user {UserId}, using ID as display name", userId);
+                displayName = userId;
             }
 
-            // Last resort - use the user ID
-            _logger.LogWarning("No name or username found for user {UserId}, using ID as display name", userId);
-            return userId;
+            // Cache the result
+            _cache.Set(cacheKey, displayName, CacheDuration);
+            return displayName;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error fetching user {UserId} from Clerk", userId);
-            return userId; // Fallback to user ID on error
+            var fallbackId = userId;
+            // Cache failed lookups for a shorter time to retry sooner
+            _cache.Set(cacheKey, fallbackId, TimeSpan.FromMinutes(5));
+            return fallbackId;
         }
     }
 

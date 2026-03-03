@@ -17,6 +17,7 @@ public class GroupRepository
     {
         return await _context.Groups
             .Include(g => g.Members)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(g => g.Id == id);
     }
 
@@ -24,6 +25,7 @@ public class GroupRepository
     {
         return await _context.Groups
             .Include(g => g.Members)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(g => g.InviteCode == inviteCode);
     }
 
@@ -36,9 +38,14 @@ public class GroupRepository
 
     public async Task<List<Group>> GetGroupsByUserIdAsync(string userId)
     {
-        return await _context.Groups
-            .Where(g => g.Members.Any(m => m.UserId == userId))
+        // Use more efficient join instead of Where/Any
+        // AsSplitQuery prevents cartesian explosion with multiple members
+        return await _context.GroupMembers
+            .Where(gm => gm.UserId == userId)
+            .Select(gm => gm.Group)
             .Include(g => g.Members)
+            .AsSplitQuery()
+            .Distinct()
             .ToListAsync();
     }
 
