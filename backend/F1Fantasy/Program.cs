@@ -165,17 +165,12 @@ builder.Services.AddSingleton<RateLimitViolationMonitor>();
 builder.Services.AddHostedService<F1Fantasy.Services.AutoLockService>();
 
 // Configure Clerk JWT Authentication
-// Accept tokens from multiple Clerk instances based on environment
-var clerkUrls = builder.Environment.IsDevelopment()
-    ? new[]
-    {
-        "https://clerk.f1fantasy.no",              // Production
-        "https://above-stag-28.clerk.accounts.dev" // Development
-    }
-    : new[]
-    {
-        "https://clerk.f1fantasy.no"               // Production only
-    };
+// Accept tokens from multiple Clerk instances
+var clerkUrls = new[]
+{
+    "https://clerk.f1fantasy.no",              // Production
+    "https://above-stag-28.clerk.accounts.dev" // Development
+};
 
 // Register MultiClerkConfigurationManager as singleton using DI
 builder.Services.AddSingleton<F1Fantasy.Services.MultiClerkConfigurationManager>(sp =>
