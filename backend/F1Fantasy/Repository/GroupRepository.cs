@@ -48,14 +48,19 @@ public class GroupRepository
         // This avoids the expensive Distinct() operation on full entities
         // and prevents loading unnecessary members data in the initial query
         var groupIds = await _context.GroupMembers
+            .AsNoTracking()
             .Where(gm => gm.UserId == userId)
             .Select(gm => gm.GroupId)
             .Distinct()
             .ToListAsync();
         
+        _logger.LogInformation("[GroupRepository.GetGroupsByUserIdAsync] After first query - GroupIds: {Count}, Elapsed: {Elapsed}ms", 
+            groupIds.Count, stopwatch.ElapsedMilliseconds);
+        
         // Now fetch the groups with their members using the IDs
         // This is more efficient than the previous approach
         var result = await _context.Groups
+            .AsNoTracking()
             .Where(g => groupIds.Contains(g.Id))
             .Include(g => g.Members)
             .OrderBy(g => g.Id)
