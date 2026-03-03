@@ -22,7 +22,7 @@ export function WildcardEditor({ value, onSave }: WildcardEditorProps) {
 
   return (
     <div className="space-y-4">
-      <F1Text muted className="block text-xs">
+      <F1Text muted className="block text-sm">
         One wildcard prediction per user. The bolder the claim, the more points the admin can assign if it comes true.
       </F1Text>
       <TextArea
@@ -32,7 +32,7 @@ export function WildcardEditor({ value, onSave }: WildcardEditorProps) {
         rows={3}
         maxLength={500}
         showCount
-        className="bg-f1-gray/80 border-f1-gray text-f1-silver placeholder:text-f1-silver/50"
+        className="bg-f1-gray/90 border-f1-gray text-f1-silver placeholder:text-f1-silver/80 focus:border-f1-red focus:shadow-[0_0_0_1px_rgba(225,6,0,0.7)] [&_.ant-input-data-count]:text-f1-silver/80 [&_.ant-input-data-count]:text-xs"
       />
       <F1Button type="primary" onClick={handleSave} disabled={!trimmed}>
         Save wildcard
