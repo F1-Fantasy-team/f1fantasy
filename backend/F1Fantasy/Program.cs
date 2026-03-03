@@ -181,7 +181,7 @@ var clerkUrls = new[]
 
 // Create custom configuration manager that merges keys from both Clerk instances
 var httpClient = new HttpClient();
-var loggerFactory = builder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
+using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
 var configLogger = loggerFactory.CreateLogger<F1Fantasy.Services.MultiClerkConfigurationManager>();
 var multiClerkConfigManager = new F1Fantasy.Services.MultiClerkConfigurationManager(
     clerkUrls, 
