@@ -261,6 +261,31 @@ export async function postWildcardFromApi(
   });
 }
 
+/** Backend wildcard item from GET /api/predictions/groups/{groupId}/wildcards */
+export interface GroupWildcardApi {
+  id: number;
+  userId: string;
+  statement: string;
+  pointsPotential?: number;
+  fulfilled?: boolean;
+}
+
+/** Get all wildcard predictions in a group (for both admins and regular members). */
+export async function fetchAllWildcardsFromApi(
+  groupId: string
+): Promise<GroupWildcardApi[] | null> {
+  if (!getApiBaseUrl()) return null;
+  try {
+    const list = await apiGet<GroupWildcardApi[]>(
+      `/api/predictions/groups/${groupId}/wildcards`
+    );
+    return Array.isArray(list) ? list : null;
+  } catch (err) {
+    if (import.meta.env.DEV) console.warn("Fetch group wildcards failed:", err);
+    return null;
+  }
+}
+
 // ----- Admin wildcard (points 100-200, fulfill) -----
 /** Backend wildcard item from GET admin/groups/{groupId}/wildcards */
 export interface AdminWildcardApi {
