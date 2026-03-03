@@ -164,6 +164,13 @@ builder.Services.AddSingleton<RateLimitViolationMonitor>();
 // Auto-lock background service
 builder.Services.AddHostedService<F1Fantasy.Services.AutoLockService>();
 
+// Validate Clerk secret key (required for ClerkService backend API calls)
+var clerkSecretKey = Environment.GetEnvironmentVariable("CLERK_SECRET_KEY");
+if (string.IsNullOrEmpty(clerkSecretKey))
+{
+    throw new InvalidOperationException("CLERK_SECRET_KEY environment variable is not set. Required for Clerk Backend API.");
+}
+
 // Configure Clerk JWT Authentication
 // Accept tokens from multiple Clerk instances
 var clerkUrls = new[]
