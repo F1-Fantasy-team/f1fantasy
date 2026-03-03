@@ -1,4 +1,5 @@
 using F1Fantasy.Services;
+using F1Fantasy.Models;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Collections.Concurrent;
 using System.Threading.RateLimiting;
@@ -30,10 +31,14 @@ public class IpBlacklistMiddleware
         {
             _logger.LogWarning("Blocked request from blacklisted IP: {IpAddress}", ipAddress);
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
-            await context.Response.WriteAsJsonAsync(new 
-            { 
-                error = "Access denied",
-                message = "Your IP address has been blocked due to suspicious activity. Contact support if you believe this is an error."
+            await context.Response.WriteAsJsonAsync(new ErrorResponse
+            {
+                Error = "Access denied",
+                Message = "Your IP address has been blocked due to suspicious activity. Contact support if you believe this is an error.",
+                RequestId = context.TraceIdentifier,
+                StatusCode = StatusCodes.Status403Forbidden,
+                Path = context.Request.Path,
+                Timestamp = DateTime.UtcNow
             });
             return;
         }
@@ -121,11 +126,15 @@ public static class RateLimitExtensions
 
             context.HttpContext.Response.Headers.RetryAfter = retryAfter.ToString();
 
-            await context.HttpContext.Response.WriteAsJsonAsync(new
+            await context.HttpContext.Response.WriteAsJsonAsync(new ErrorResponse
             {
-                error = "Rate limit exceeded",
-                message = "Too many requests. Please slow down and try again later.",
-                retryAfter = $"{retryAfter} seconds"
+                Error = "Rate limit exceeded",
+                Message = "Too many requests. Please slow down and try again later.",
+                RetryAfter = $"{retryAfter} seconds",
+                RequestId = context.HttpContext.TraceIdentifier,
+                StatusCode = StatusCodes.Status429TooManyRequests,
+                Path = context.HttpContext.Request.Path,
+                Timestamp = DateTime.UtcNow
             }, cancellationToken);
 
             logger.LogWarning("Rate limit exceeded for IP: {IpAddress}, Endpoint: {Path}", 

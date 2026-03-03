@@ -50,7 +50,12 @@ builder.WebHost.ConfigureKestrel(options =>
 
 // Configure logging
 builder.Logging.ClearProviders();
-builder.Logging.AddConsole();
+builder.Logging.AddSimpleConsole(options =>
+{
+    options.IncludeScopes = true;
+    options.SingleLine = true;
+    options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ ";
+});
 builder.Logging.AddDebug();
 builder.Logging.SetMinimumLevel(LogLevel.Information);
 
@@ -197,10 +202,11 @@ builder.Services.AddSingleton<F1Fantasy.Services.MultiClerkConfigurationManager>
 });
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+    .AddJwtBearer();
+
+builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+    .Configure<F1Fantasy.Services.MultiClerkConfigurationManager>((options, configManager) =>
     {
-        // Use custom configuration manager from DI
-        var configManager = builder.Services.BuildServiceProvider().GetRequiredService<F1Fantasy.Services.MultiClerkConfigurationManager>();
         options.ConfigurationManager = configManager;
         options.RequireHttpsMetadata = true;
 
@@ -347,7 +353,11 @@ builder.Services.Configure<GzipCompressionProviderOptions>(options =>
 // Add response caching to reduce repeated requests
 builder.Services.AddResponseCaching();
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+    });
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
@@ -370,6 +380,9 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// Add request context middleware first to attach correlation id and total request timing
+app.UseMiddleware<RequestContextLoggingMiddleware>();
 
 // Add response compression early in pipeline (before other middleware)
 app.UseResponseCompression();
