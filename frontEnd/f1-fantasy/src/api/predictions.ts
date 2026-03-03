@@ -88,9 +88,7 @@ export async function postDriverChampionshipFromApi(
   const rankedDriverIds = [...prediction]
     .sort((a, b) => a.position - b.position)
     .map((e) => e.driverId);
-  await apiPost(`/api/predictions/groups/${groupId}/driver-championship`, {
-    rankedDriverIds,
-  });
+  await apiPost(`/api/predictions/groups/${groupId}/driver-championship`, rankedDriverIds);
 }
 
 // ----- Constructor championship -----
@@ -119,9 +117,7 @@ export async function postConstructorChampionshipFromApi(
   const rankedConstructorIds = [...prediction]
     .sort((a, b) => a.position - b.position)
     .map((e) => e.constructorId);
-  await apiPost(`/api/predictions/groups/${groupId}/constructor-championship`, {
-    rankedConstructorIds,
-  });
+  await apiPost(`/api/predictions/groups/${groupId}/constructor-championship`, rankedConstructorIds);
 }
 
 // ----- Two-driver categories -----
