@@ -44,15 +44,21 @@ public class GroupRepository
         var stopwatch = Stopwatch.StartNew();
         _logger.LogInformation("[GroupRepository.GetGroupsByUserIdAsync] Start - UserId: {UserId}", userId);
         
-        // Use more efficient join instead of Where/Any
-        // AsSplitQuery prevents cartesian explosion with multiple members
-        var result = await _context.GroupMembers
+        // Optimized: Get distinct group IDs first, then fetch groups
+        // This avoids the expensive Distinct() operation on full entities
+        // and prevents loading unnecessary members data in the initial query
+        var groupIds = await _context.GroupMembers
             .Where(gm => gm.UserId == userId)
-            .Include(gm => gm.Group)
-                .ThenInclude(g => g.Members)
-            .Select(gm => gm.Group)
-            .AsSplitQuery()
+            .Select(gm => gm.GroupId)
             .Distinct()
+            .ToListAsync();
+        
+        // Now fetch the groups with their members using the IDs
+        // This is more efficient than the previous approach
+        var result = await _context.Groups
+            .Where(g => groupIds.Contains(g.Id))
+            .Include(g => g.Members)
+            .OrderBy(g => g.Id)
             .ToListAsync();
         
         stopwatch.Stop();
