@@ -212,34 +212,42 @@ public class DriverService
         // Use current year if season not specified
         season ??= DateTime.UtcNow.Year.ToString();
         
-        _logger.LogDebug("Getting active drivers for season {Season}", season);
+        _logger.LogInformation("[GetActiveDriversAsync] Getting active drivers for season {Season}", season);
         
         // Check if we have any active drivers for this season
         var activeDrivers = await _driverRepository.GetActiveDriversAsync(season);
+        _logger.LogInformation("[GetActiveDriversAsync] Initial query returned {Count} drivers for season {Season}", 
+            activeDrivers.Count(), season);
         
         // If no active drivers found, fetch them from the API
         if (!activeDrivers.Any())
         {
-            _logger.LogInformation("No active drivers found for season {Season}. Fetching from API...", season);
+            _logger.LogWarning("[GetActiveDriversAsync] No active drivers found for season {Season}. Attempting to fetch from API...", season);
             try
             {
                 // This will populate the ActiveSeasons list
-                await GetDriversBySeasonAsync(season);
+                var fetchedDrivers = await GetDriversBySeasonAsync(season);
+                _logger.LogInformation("[GetActiveDriversAsync] GetDriversBySeasonAsync returned {Count} drivers", fetchedDrivers.Count());
                 
                 // Retrieve again after populating
                 activeDrivers = await _driverRepository.GetActiveDriversAsync(season);
-                _logger.LogInformation("Successfully populated {Count} active drivers for season {Season}", 
+                _logger.LogInformation("[GetActiveDriversAsync] Successfully populated {Count} active drivers for season {Season}", 
                     activeDrivers.Count(), season);
+                
+                if (!activeDrivers.Any())
+                {
+                    _logger.LogError("[GetActiveDriversAsync] After API fetch, still no active drivers found for season {Season}. This indicates a data population issue.", season);
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to fetch active drivers for season {Season} from API", season);
+                _logger.LogError(ex, "[GetActiveDriversAsync] Failed to fetch active drivers for season {Season} from API: {Message}", season, ex.Message);
                 throw;
             }
         }
         else
         {
-            _logger.LogDebug("Retrieved {Count} active drivers for season {Season} from cache", 
+            _logger.LogInformation("[GetActiveDriversAsync] Retrieved {Count} active drivers for season {Season} from database", 
                 activeDrivers.Count(), season);
         }
         

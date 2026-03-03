@@ -1,16 +1,19 @@
 using F1Fantasy.Models;
 using F1Fantasy.Repository;
 using F1Fantasy.Validation;
+using System.Diagnostics;
 
 namespace F1Fantasy.Services;
 
 public class GroupService
 {
     private readonly GroupRepository _groupRepository;
+    private readonly ILogger<GroupService> _logger;
 
-    public GroupService(GroupRepository groupRepository)
+    public GroupService(GroupRepository groupRepository, ILogger<GroupService> logger)
     {
         _groupRepository = groupRepository;
+        _logger = logger;
     }
 
     public async Task<Group> CreateGroupAsync(string name, string adminUserId, string lockMode)
@@ -56,7 +59,14 @@ public class GroupService
 
     public async Task<List<Group>> GetUserGroupsAsync(string userId)
     {
-        return await _groupRepository.GetGroupsByUserIdAsync(userId);
+        var stopwatch = Stopwatch.StartNew();
+        _logger.LogInformation("[GroupService.GetUserGroupsAsync] Start - UserId: {UserId}", userId);
+        
+        var result = await _groupRepository.GetGroupsByUserIdAsync(userId);
+        
+        stopwatch.Stop();
+        _logger.LogInformation("[GroupService.GetUserGroupsAsync] Complete - GroupCount: {Count}, Elapsed: {Elapsed}ms", result.Count, stopwatch.ElapsedMilliseconds);
+        return result;
     }
 
     public async Task<GroupMember> JoinGroupAsync(int groupId, string userId)

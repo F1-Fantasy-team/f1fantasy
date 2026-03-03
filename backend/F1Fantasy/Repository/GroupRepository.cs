@@ -1,16 +1,19 @@
 using F1Fantasy.Data;
 using F1Fantasy.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Diagnostics;
 
 namespace F1Fantasy.Repository;
 
 public class GroupRepository
 {
     private readonly F1FantasyDbContext _context;
+    private readonly ILogger<GroupRepository> _logger;
 
-    public GroupRepository(F1FantasyDbContext context)
+    public GroupRepository(F1FantasyDbContext context, ILogger<GroupRepository> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     public async Task<Group?> GetByIdAsync(int id)
@@ -38,9 +41,12 @@ public class GroupRepository
 
     public async Task<List<Group>> GetGroupsByUserIdAsync(string userId)
     {
+        var stopwatch = Stopwatch.StartNew();
+        _logger.LogInformation("[GroupRepository.GetGroupsByUserIdAsync] Start - UserId: {UserId}", userId);
+        
         // Use more efficient join instead of Where/Any
         // AsSplitQuery prevents cartesian explosion with multiple members
-        return await _context.GroupMembers
+        var result = await _context.GroupMembers
             .Where(gm => gm.UserId == userId)
             .Include(gm => gm.Group)
                 .ThenInclude(g => g.Members)
@@ -48,6 +54,13 @@ public class GroupRepository
             .AsSplitQuery()
             .Distinct()
             .ToListAsync();
+        
+        stopwatch.Stop();
+        _logger.LogInformation("[GroupRepository.GetGroupsByUserIdAsync] Complete - GroupCount: {Count}, MemberCount: {MemberCount}, Elapsed: {Elapsed}ms", 
+            result.Count, 
+            result.Sum(g => g.Members.Count), 
+            stopwatch.ElapsedMilliseconds);
+        return result;
     }
 
     public async Task<Group> CreateAsync(Group group)
