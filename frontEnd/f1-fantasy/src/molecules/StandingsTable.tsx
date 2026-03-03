@@ -21,11 +21,14 @@ export function StandingsTable({ standings, currentUserId }: StandingsTableProps
       title: "Member",
       dataIndex: "displayName",
       key: "displayName",
-      render: (name: string, record: MemberStanding) => (
-        <span className={record.userId === currentUserId ? "text-f1-red font-medium" : "text-f1-silver"}>
-          {record.userId === currentUserId ? `${name} (you)` : name}
-        </span>
-      ),
+      render: (name: string, record: MemberStanding) => {
+        const effectiveName = (name && name.trim().length > 0) ? name : record.userId;
+        return (
+          <span className={record.userId === currentUserId ? "text-f1-red font-medium" : "text-f1-silver"}>
+            {record.userId === currentUserId ? `${effectiveName} (you)` : effectiveName}
+          </span>
+        );
+      },
     },
     {
       title: "Score",
