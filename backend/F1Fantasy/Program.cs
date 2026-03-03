@@ -135,6 +135,7 @@ builder.Services.AddScoped<F1Fantasy.Services.GroupService>();
 builder.Services.AddScoped<F1Fantasy.Services.PredictionService>();
 builder.Services.AddScoped<F1Fantasy.Services.ScoringService>();
 builder.Services.AddScoped<F1Fantasy.Services.StandingsService>();
+builder.Services.AddScoped<F1Fantasy.Services.ClerkService>();
 
 // Rate limiting and security services
 builder.Services.AddSingleton<IIpBlacklistService, IpBlacklistService>();

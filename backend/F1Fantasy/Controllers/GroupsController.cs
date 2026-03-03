@@ -1,3 +1,4 @@
+using F1Fantasy.Models;
 using F1Fantasy.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,10 +15,12 @@ namespace F1Fantasy.Controllers;
 public class GroupsController : ControllerBase
 {
     private readonly GroupService _groupService;
+    private readonly ClerkService _clerkService;
 
-    public GroupsController(GroupService groupService)
+    public GroupsController(GroupService groupService, ClerkService clerkService)
     {
         _groupService = groupService;
+        _clerkService = clerkService;
     }
 
     private string GetUserId()
@@ -49,7 +52,8 @@ public class GroupsController : ControllerBase
         {
             var userId = GetUserId();
             var groups = await _groupService.GetUserGroupsAsync(userId);
-            return Ok(groups);
+            var groupDtos = await EnrichGroupsWithMemberNamesAsync(groups);
+            return Ok(groupDtos);
         }
         catch (Exception ex)
         {
@@ -64,7 +68,8 @@ public class GroupsController : ControllerBase
         {
             var group = await _groupService.GetGroupByIdAsync(id);
             if (group == null) return NotFound();
-            return Ok(group);
+            var groupDto = await EnrichGroupWithMemberNamesAsync(group);
+            return Ok(groupDto);
         }
         catch (Exception ex)
         {
@@ -79,7 +84,8 @@ public class GroupsController : ControllerBase
         {
             var group = await _groupService.GetGroupByInviteCodeAsync(inviteCode);
             if (group == null) return NotFound();
-            return Ok(group);
+            var groupDto = await EnrichGroupWithMemberNamesAsync(group);
+            return Ok(groupDto);
         }
         catch (Exception ex)
         {
@@ -239,6 +245,60 @@ public class GroupsController : ControllerBase
         {
             return BadRequest(new { error = ex.Message });
         }
+    }
+
+    private async Task<GroupDto> EnrichGroupWithMemberNamesAsync(Group group)
+    {
+        var userIds = group.Members.Select(m => m.UserId).ToList();
+        var displayNames = await _clerkService.GetUserDisplayNamesAsync(userIds);
+
+        return new GroupDto
+        {
+            Id = group.Id,
+            Name = group.Name,
+            InviteCode = group.InviteCode,
+            LockMode = group.LockMode,
+            AdminUserId = group.AdminUserId,
+            CreatedAt = group.CreatedAt,
+            PredictionsLocked = group.PredictionsLocked,
+            LockedAt = group.LockedAt,
+            Members = group.Members.Select(m => new GroupMemberDto
+            {
+                Id = m.Id,
+                GroupId = m.GroupId,
+                UserId = m.UserId,
+                DisplayName = displayNames.GetValueOrDefault(m.UserId, m.UserId),
+                IsAdmin = m.UserId == group.AdminUserId,
+                JoinedAt = m.JoinedAt
+            }).ToList()
+        };
+    }
+
+    private async Task<List<GroupDto>> EnrichGroupsWithMemberNamesAsync(List<Group> groups)
+    {
+        var allUserIds = groups.SelectMany(g => g.Members.Select(m => m.UserId)).Distinct().ToList();
+        var displayNames = await _clerkService.GetUserDisplayNamesAsync(allUserIds);
+
+        return groups.Select(group => new GroupDto
+        {
+            Id = group.Id,
+            Name = group.Name,
+            InviteCode = group.InviteCode,
+            LockMode = group.LockMode,
+            AdminUserId = group.AdminUserId,
+            CreatedAt = group.CreatedAt,
+            PredictionsLocked = group.PredictionsLocked,
+            LockedAt = group.LockedAt,
+            Members = group.Members.Select(m => new GroupMemberDto
+            {
+                Id = m.Id,
+                GroupId = m.GroupId,
+                UserId = m.UserId,
+                DisplayName = displayNames.GetValueOrDefault(m.UserId, m.UserId),
+                IsAdmin = m.UserId == group.AdminUserId,
+                JoinedAt = m.JoinedAt
+            }).ToList()
+        }).ToList();
     }
 }
 
