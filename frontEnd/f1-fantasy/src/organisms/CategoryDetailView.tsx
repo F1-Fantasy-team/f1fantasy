@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useSetRecoilState, useRecoilValue } from "recoil";
 import { ArrowLeftOutlined } from "@ant-design/icons";
 import { App, InputNumber, Checkbox } from "antd";
@@ -360,6 +360,21 @@ export function CategoryDetailView({ group, categoryId, data, setData, currentUs
     }));
   };
 
+  // Debounce pointsPotential updates so we don't POST on every keypress.
+  const pointsDebounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  const handleAdminSetWildcardPointsDebounced = (userId: string, rawValue: number | null) => {
+    if (rawValue == null) return;
+    const clamped = Math.max(100, Math.min(200, rawValue));
+    const timers = pointsDebounceRef.current;
+    if (timers[userId]) {
+      clearTimeout(timers[userId]);
+    }
+    timers[userId] = setTimeout(() => {
+      void handleAdminSetWildcard(userId, { pointsPotential: clamped });
+    }, 400);
+  };
+
   return (
     <div className="min-w-0 space-y-6">
       <F1Button
@@ -502,7 +517,7 @@ export function CategoryDetailView({ group, categoryId, data, setData, currentUs
                             min={100}
                             max={200}
                             value={w.pointsPotential ?? 100}
-                            onChange={(val) => handleAdminSetWildcard(userPrediction.userId, { pointsPotential: val ?? undefined })}
+                        onChange={(val) => handleAdminSetWildcardPointsDebounced(userPrediction.userId, val)}
                             className="w-20 bg-f1-gray border-f1-gray text-f1-silver [&_.ant-input-number-input]:bg-transparent"
                           />
                         </label>
