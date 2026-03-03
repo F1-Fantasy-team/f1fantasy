@@ -53,7 +53,6 @@ public class MultiClerkConfigurationManager : IConfigurationManager<OpenIdConnec
             // Fetch configurations from all Clerk instances
             var configurations = new List<OpenIdConnectConfiguration>();
             var issuers = new List<string>();
-            var configurationRetriever = new OpenIdConnectConfigurationRetriever();
 
             foreach (var metadataAddress in _metadataAddresses)
             {
@@ -66,10 +65,12 @@ public class MultiClerkConfigurationManager : IConfigurationManager<OpenIdConnec
                         RequireHttps = metadataAddress.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
                     };
 
-                    var config = await configurationRetriever.GetConfigurationAsync(
+                    var configurationManager = new ConfigurationManager<OpenIdConnectConfiguration>(
                         metadataAddress,
-                        documentRetriever,
-                        cancel);
+                        new OpenIdConnectConfigurationRetriever(),
+                        documentRetriever);
+
+                    var config = await configurationManager.GetConfigurationAsync(cancel);
 
                     configurations.Add(config);
                     
@@ -121,8 +122,9 @@ public class MultiClerkConfigurationManager : IConfigurationManager<OpenIdConnec
                     string? thumbprint = null;
                     if (key is JsonWebKey jwk)
                     {
-                        // ComputeJwkThumbprint returns a stable identifier for the JWK material.
-                        thumbprint = jwk.ComputeJwkThumbprint();
+                        // ComputeJwkThumbprint returns a byte array, convert to base64 string.
+                        var thumbprintBytes = jwk.ComputeJwkThumbprint();
+                        thumbprint = Convert.ToBase64String(thumbprintBytes);
                     }
 
                     if (!string.IsNullOrEmpty(thumbprint))
