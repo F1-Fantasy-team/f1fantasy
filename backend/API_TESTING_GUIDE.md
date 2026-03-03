@@ -92,7 +92,60 @@ GET /api/groups/1
 Authorization: Bearer YOUR_TOKEN
 ```
 
-Response: Group details with all members and their display names from Clerk
+Response: Group details with all members, their display names from Clerk, **and all their predictions**
+
+```json
+{
+  "id": 1,
+  "name": "My F1 Fantasy League",
+  "inviteCode": "ABC12XYZ",
+  "lockMode": "admin",
+  "adminUserId": "user_xxx",
+  "predictionsLocked": false,
+  "lockedAt": null,
+  "createdAt": "2025-02-22T14:00:00Z",
+  "members": [
+    {
+      "id": 1,
+      "groupId": 1,
+      "userId": "user_xxx",
+      "displayName": "John Doe",
+      "isAdmin": true,
+      "joinedAt": "2025-02-22T14:00:00Z",
+      "driverChampionship": {
+        "id": 1,
+        "groupId": 1,
+        "userId": "user_xxx",
+        "rankedDriverIds": ["max_verstappen", "charles_leclerc", ...],
+        "createdAt": "2025-02-22T10:00:00Z"
+      },
+      "constructorChampionship": { ... },
+      "driverDraft": { ... },
+      "destructor": { ... },
+      "mrSaturday": { ... },
+      "zeroPointer": { ... },
+      "wildcard": { ... }
+    },
+    {
+      "id": 2,
+      "groupId": 1,
+      "userId": "user_yyy",
+      "displayName": "Jane Smith",
+      "isAdmin": false,
+      "joinedAt": "2025-02-22T15:30:00Z",
+      "driverChampionship": null,
+      "constructorChampionship": null,
+      "driverDraft": { ... },
+      "destructor": null,
+      "mrSaturday": null,
+      "zeroPointer": null,
+      "wildcard": { ... }
+    }
+  ]
+}
+```
+
+**Note**: Any prediction category that hasn't been submitted will be `null`. Perfect for displaying everyone's predictions in one call!
 
 ### 4. Get Group by Invite Code
 ```http
@@ -100,7 +153,7 @@ GET /api/groups/invite/ABC12XYZ
 Authorization: Bearer YOUR_TOKEN
 ```
 
-Response: Group details with members and display names (useful for preview before joining)
+Response: Group details with members, display names, **and all predictions** (useful for preview before joining)
 
 ### 5. Join a Group
 ```http
@@ -317,7 +370,7 @@ POST /api/groups/1/unlock
 Authorization: Bearer ADMIN_TOKEN
 ```
 
-### 12. Get Standings (Auto-Recalculates)
+### 13. Get Standings (Auto-Recalculates)
 ```http
 GET /api/standings/groups/1?season=2025
 Authorization: Bearer YOUR_TOKEN

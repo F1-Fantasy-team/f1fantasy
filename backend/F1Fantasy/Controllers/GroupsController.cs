@@ -17,12 +17,14 @@ public class GroupsController : ControllerBase
 {
     private readonly GroupService _groupService;
     private readonly ClerkService _clerkService;
+    private readonly PredictionService _predictionService;
     private readonly ILogger<GroupsController> _logger;
 
-    public GroupsController(GroupService groupService, ClerkService clerkService, ILogger<GroupsController> logger)
+    public GroupsController(GroupService groupService, ClerkService clerkService, PredictionService predictionService, ILogger<GroupsController> logger)
     {
         _groupService = groupService;
         _clerkService = clerkService;
+        _predictionService = predictionService;
         _logger = logger;
     }
 
@@ -82,7 +84,7 @@ public class GroupsController : ControllerBase
         {
             var group = await _groupService.GetGroupByIdAsync(id);
             if (group == null) return NotFound();
-            var groupDto = await EnrichGroupWithMemberNamesAsync(group);
+            var groupDto = await EnrichGroupWithMemberNamesAndPredictionsAsync(group);
             return Ok(groupDto);
         }
         catch (Exception ex)
@@ -98,7 +100,7 @@ public class GroupsController : ControllerBase
         {
             var group = await _groupService.GetGroupByInviteCodeAsync(inviteCode);
             if (group == null) return NotFound();
-            var groupDto = await EnrichGroupWithMemberNamesAsync(group);
+            var groupDto = await EnrichGroupWithMemberNamesAndPredictionsAsync(group);
             return Ok(groupDto);
         }
         catch (Exception ex)
@@ -285,6 +287,48 @@ public class GroupsController : ControllerBase
                 IsAdmin = m.UserId == group.AdminUserId,
                 JoinedAt = m.JoinedAt
             }).ToList()
+        };
+    }
+
+    private async Task<GroupDto> EnrichGroupWithMemberNamesAndPredictionsAsync(Group group)
+    {
+        var userIds = group.Members.Select(m => m.UserId).ToList();
+        var displayNames = await _clerkService.GetUserDisplayNamesAsync(userIds);
+
+        var members = new List<GroupMemberDto>();
+        
+        foreach (var member in group.Members)
+        {
+            var memberDto = new GroupMemberDto
+            {
+                Id = member.Id,
+                GroupId = member.GroupId,
+                UserId = member.UserId,
+                DisplayName = displayNames.GetValueOrDefault(member.UserId, member.UserId),
+                IsAdmin = member.UserId == group.AdminUserId,
+                JoinedAt = member.JoinedAt,
+                DriverChampionship = await _predictionService.GetDriverChampionshipAsync(group.Id, member.UserId),
+                ConstructorChampionship = await _predictionService.GetConstructorChampionshipAsync(group.Id, member.UserId),
+                DriverDraft = await _predictionService.GetDriverDraftAsync(group.Id, member.UserId),
+                Destructor = await _predictionService.GetDestructorAsync(group.Id, member.UserId),
+                MrSaturday = await _predictionService.GetMrSaturdayAsync(group.Id, member.UserId),
+                ZeroPointer = await _predictionService.GetZeroPointerAsync(group.Id, member.UserId),
+                Wildcard = await _predictionService.GetWildcardAsync(group.Id, member.UserId)
+            };
+            members.Add(memberDto);
+        }
+
+        return new GroupDto
+        {
+            Id = group.Id,
+            Name = group.Name,
+            InviteCode = group.InviteCode,
+            LockMode = group.LockMode,
+            AdminUserId = group.AdminUserId,
+            CreatedAt = group.CreatedAt,
+            PredictionsLocked = group.PredictionsLocked,
+            LockedAt = group.LockedAt,
+            Members = members
         };
     }
 
