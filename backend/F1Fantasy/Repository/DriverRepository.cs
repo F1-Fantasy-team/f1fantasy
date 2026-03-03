@@ -91,13 +91,11 @@ public class DriverRepository
                     existing.Nationality = driver.Nationality;
                     existing.Url = driver.Url;
                     
-                    // Merge ActiveSeasons
+                    // Update ActiveSeasons - clear and rebuild to ensure EF Core tracks changes
+                    existing.ActiveSeasons.Clear();
                     foreach (var season in driver.ActiveSeasons)
                     {
-                        if (!existing.ActiveSeasons.Contains(season))
-                        {
-                            existing.ActiveSeasons.Add(season);
-                        }
+                        existing.ActiveSeasons.Add(season);
                     }
                     updatedCount++;
                 }

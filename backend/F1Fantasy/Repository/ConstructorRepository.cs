@@ -72,13 +72,11 @@ public class ConstructorRepository
                     existing.Url = constructor.Url;
                     existing.Nationality = constructor.Nationality;
                     
-                    // Merge ActiveSeasons
+                    // Update ActiveSeasons - clear and rebuild to ensure EF Core tracks changes
+                    existing.ActiveSeasons.Clear();
                     foreach (var season in constructor.ActiveSeasons)
                     {
-                        if (!existing.ActiveSeasons.Contains(season))
-                        {
-                            existing.ActiveSeasons.Add(season);
-                        }
+                        existing.ActiveSeasons.Add(season);
                     }
                     updatedCount++;
                 }
