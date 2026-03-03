@@ -297,6 +297,14 @@ GET /api/predictions/groups/1/wildcard
 Authorization: Bearer YOUR_TOKEN
 ```
 
+### 9b. Get All Wildcard Predictions in Group
+```http
+GET /api/predictions/groups/1/wildcards
+Authorization: Bearer YOUR_TOKEN
+```
+
+**Note**: Returns all wildcard predictions for all members in the group. Useful for seeing what other people predicted.
+
 ### 10. Lock Predictions (Admin Only)
 ```http
 POST /api/groups/1/lock
@@ -518,6 +526,7 @@ All prediction endpoints require authentication. Replace `{groupId}` with the gr
 |--------|----------|-------------|
 | POST | `/api/predictions/groups/{groupId}/wildcard` | Submit wildcard statement |
 | GET | `/api/predictions/groups/{groupId}/wildcard` | Get your wildcard prediction |
+| GET | `/api/predictions/groups/{groupId}/wildcards` | Get all wildcard predictions in the group |
 
 ### Standings Endpoints
 
