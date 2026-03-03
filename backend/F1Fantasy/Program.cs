@@ -98,6 +98,25 @@ builder.Services.AddDbContext<F1FantasyDbContext>(options =>
     }
 });
 
+// Add DbContextFactory for services that need concurrent database access
+builder.Services.AddDbContextFactory<F1FantasyDbContext>(options =>
+{
+    var connString = builder.Configuration.GetConnectionString("DefaultConnection");
+    if (string.IsNullOrEmpty(connString))
+    {
+        throw new InvalidOperationException("Database connection string 'DefaultConnection' not found. Please configure it in appsettings.json or environment variables.");
+    }
+    options.UseNpgsql(connString, npgsqlOptions =>
+    {
+        npgsqlOptions.CommandTimeout(30);
+        npgsqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 3,
+            maxRetryDelay: TimeSpan.FromSeconds(5),
+            errorCodesToAdd: null);
+    });
+    options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
+});
+
 // Add services to the container.
 builder.Services.AddHttpClient();
 builder.Services.AddMemoryCache(); // For caching Clerk user data and other frequently accessed data
