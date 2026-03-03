@@ -171,27 +171,42 @@ if (string.IsNullOrEmpty(clerkSecretKey))
     throw new InvalidOperationException("CLERK_SECRET_KEY environment variable is not set. Please configure it in .env file.");
 }
 
+// OPTION 2: Accept tokens from MULTIPLE Clerk instances (Dev + Prod)
+// This requires custom configuration manager to fetch signing keys from both instances
+var clerkUrls = new[]
+{
+    "https://clerk.f1fantasy.no",              // Production
+    "https://above-stag-28.clerk.accounts.dev" // Development
+};
+
+// Create custom configuration manager that merges keys from both Clerk instances
+var httpClient = new HttpClient();
+var loggerFactory = builder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
+var configLogger = loggerFactory.CreateLogger<F1Fantasy.Services.MultiClerkConfigurationManager>();
+var multiClerkConfigManager = new F1Fantasy.Services.MultiClerkConfigurationManager(
+    clerkUrls, 
+    httpClient,
+    configLogger
+);
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        // Replace with YOUR actual Frontend API URL from Clerk Dashboard
-        var frontendApiUrl = "https://clerk.f1fantasy.no/";  // ← change this!
-
-        options.Authority = frontendApiUrl;                     // Enables discovery
-        options.MetadataAddress = $"{frontendApiUrl}/.well-known/openid-configuration"; // optional but good
-        options.RequireHttpsMetadata = true;                    // keep true in prod
+        // Use custom configuration manager instead of Authority
+        options.ConfigurationManager = multiClerkConfigManager;
+        options.RequireHttpsMetadata = true;
 
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidateIssuer = true,                              // will use discovered issuer
-            ValidateAudience = false,                           // Clerk doesn't require/validate aud by default
+            ValidateIssuer = true,
+            // Accept tokens from BOTH Clerk instances
+            ValidIssuers = clerkUrls,
+            ValidateAudience = false,  // Clerk doesn't use audience validation
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            // Do NOT set ValidIssuer or ValidIssuers manually — let discovery handle it
             ClockSkew = TimeSpan.FromMinutes(5)
         };
 
-        // Optional: log more details on failure
         options.Events = new JwtBearerEvents
         {
             OnAuthenticationFailed = context =>
@@ -203,8 +218,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             OnTokenValidated = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                var userId = context.Principal?.FindFirst("sub")?.Value; // Clerk uses "sub" for user ID
-                logger.LogInformation("Token validated successfully for user: {UserId}", userId);
+                var userId = context.Principal?.FindFirst("sub")?.Value;
+                var issuer = context.Principal?.FindFirst("iss")?.Value;
+                logger.LogInformation("Token validated for user {UserId} from {Issuer}", userId, issuer);
                 return Task.CompletedTask;
             }
         };
