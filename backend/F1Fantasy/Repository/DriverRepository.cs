@@ -82,6 +82,10 @@ public class DriverRepository
             {
                 if (existingDrivers.TryGetValue(driver.DriverId, out var existing))
                 {
+                    // Log incoming data for diagnosis
+                    _logger.LogDebug("[AddOrUpdateBatchAsync] Driver {DriverId} incoming ActiveSeasons: [{Seasons}]",
+                        driver.DriverId, string.Join(", ", driver.ActiveSeasons));
+                    
                     // Update existing driver
                     existing.PermanentNumber = driver.PermanentNumber;
                     existing.Code = driver.Code;
@@ -91,12 +95,14 @@ public class DriverRepository
                     existing.Nationality = driver.Nationality;
                     existing.Url = driver.Url;
                     
-                    // Update ActiveSeasons - clear and rebuild to ensure EF Core tracks changes
-                    existing.ActiveSeasons.Clear();
-                    foreach (var season in driver.ActiveSeasons)
-                    {
-                        existing.ActiveSeasons.Add(season);
-                    }
+                    // Update ActiveSeasons - explicitly mark as modified for EF Core to track PostgreSQL array
+                    existing.ActiveSeasons = driver.ActiveSeasons.ToList();
+                    _context.Entry(existing).Property(e => e.ActiveSeasons).IsModified = true;
+                    
+                    _logger.LogDebug("[AddOrUpdateBatchAsync] Driver {DriverId} after assignment: [{Seasons}], IsModified: {IsModified}",
+                        driver.DriverId, string.Join(", ", existing.ActiveSeasons),
+                        _context.Entry(existing).Property(e => e.ActiveSeasons).IsModified);
+                    
                     updatedCount++;
                 }
                 else
@@ -111,6 +117,16 @@ public class DriverRepository
             await _context.SaveChangesAsync();
             _logger.LogInformation("Batch processed {Total} drivers: {Added} added, {Updated} updated", 
                 driverList.Count, addedCount, updatedCount);
+            
+            // Verify what was actually written to database
+            var verifyDriver = await _context.Drivers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(d => driverIds.Contains(d.DriverId));
+            if (verifyDriver != null)
+            {
+                _logger.LogWarning("[AddOrUpdateBatchAsync] POST-SAVE verification: Driver {DriverId} in DB has ActiveSeasons: [{Seasons}]",
+                    verifyDriver.DriverId, string.Join(", ", verifyDriver.ActiveSeasons));
+            }
             
             // Log a sample to verify ActiveSeasons
             var sampleDriver = driverList.FirstOrDefault();
