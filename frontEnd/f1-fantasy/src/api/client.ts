@@ -27,7 +27,7 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 
 const baseUrl = (path: string) => {
   const base = getApiBaseUrl();
-  if (!base) throw new Error("VITE_API_BASE_URL is not set");
+  if (!base) throw new Error("Service base address is not configured.");
   return path.startsWith("http") ? path : `${base}${path.startsWith("/") ? path : `/${path}`}`;
 };
 
@@ -35,7 +35,7 @@ export async function apiGet<T>(path: string): Promise<T> {
   const url = baseUrl(path);
   const headers = await getAuthHeaders();
   const res = await fetch(url, { method: "GET", headers });
-  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
+  if (!res.ok) throw new Error(`Request failed (${res.status}: ${res.statusText})`);
   return res.json() as Promise<T>;
 }
 
@@ -45,7 +45,7 @@ export async function apiGetOptional<T>(path: string): Promise<T | null> {
   const headers = await getAuthHeaders();
   const res = await fetch(url, { method: "GET", headers });
   if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
+  if (!res.ok) throw new Error(`Request failed (${res.status}: ${res.statusText})`);
   return res.json() as Promise<T>;
 }
 
@@ -58,7 +58,7 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
-  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
+  if (!res.ok) throw new Error(`Request failed (${res.status}: ${res.statusText})`);
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
@@ -68,7 +68,7 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T> {
   const headers = await getAuthHeaders();
   headers["Content-Type"] = "application/json";
   const res = await fetch(url, { method: "PUT", headers, body: JSON.stringify(body) });
-  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
+  if (!res.ok) throw new Error(`Request failed (${res.status}: ${res.statusText})`);
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
@@ -77,5 +77,5 @@ export async function apiDelete(path: string): Promise<void> {
   const url = baseUrl(path);
   const headers = await getAuthHeaders();
   const res = await fetch(url, { method: "DELETE", headers });
-  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
+  if (!res.ok) throw new Error(`Request failed (${res.status}: ${res.statusText})`);
 }

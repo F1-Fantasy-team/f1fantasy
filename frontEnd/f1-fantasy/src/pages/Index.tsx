@@ -284,7 +284,7 @@ export default function Index() {
 
   const handleDeleteGroup = async (groupId: string) => {
     if (!getApiBaseUrl()) {
-      message.error("API not configured");
+      message.error("Service is currently unavailable. Please try again later.");
       return;
     }
     try {
@@ -353,7 +353,7 @@ export default function Index() {
 
   const handleLeaveGroup = async (groupId: string) => {
     if (!getApiBaseUrl()) {
-      message.error("API not configured");
+      message.error("Service is currently unavailable. Please try again later.");
       return;
     }
     try {
@@ -374,7 +374,7 @@ export default function Index() {
     const trimmed = newName.trim();
     if (!trimmed) return;
     if (!getApiBaseUrl()) {
-      message.error("API not configured");
+      message.error("Service is currently unavailable. Please try again later.");
       return;
     }
     try {
@@ -449,7 +449,7 @@ export default function Index() {
     name: string;
     predictionLockMode: PredictionLockMode;
   }): Promise<Group> => {
-    if (!getApiBaseUrl()) throw new Error("API not configured");
+    if (!getApiBaseUrl()) throw new Error("Service is currently unavailable.");
     const group = await createGroupFromApi(payload.name, payload.predictionLockMode);
     if (group) return group;
     throw new Error("Failed to create group");

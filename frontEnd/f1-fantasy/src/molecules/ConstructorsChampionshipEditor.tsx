@@ -116,8 +116,7 @@ export function ConstructorsChampionshipEditor({ value, onSave }: ConstructorsCh
     return (
       <div className="space-y-2">
         <F1Text muted className="block text-sm">
-          No constructors loaded. Set <code className="rounded bg-f1-gray px-1 text-xs">VITE_API_BASE_URL</code> and ensure
-          the constructors API returns data for the current season.
+          No constructors are currently available. Please try again later or contact the administrator.
         </F1Text>
       </div>
     );
@@ -128,8 +127,8 @@ export function ConstructorsChampionshipEditor({ value, onSave }: ConstructorsCh
       <F1Text muted className="block text-xs">
         {`Drag constructors to reorder. Top = P1, bottom = P${count}.`}
         {fromApi
-          ? ` (${constructors.length} constructors from API)`
-          : ` (${constructors.length} constructors — offline list; set API to use live data)`}
+          ? ` (${constructors.length} constructors loaded)`
+          : ` (${constructors.length} constructors available)`}
       </F1Text>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <div className="min-w-0 overflow-x-auto">
