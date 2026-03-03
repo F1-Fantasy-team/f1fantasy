@@ -376,4 +376,39 @@ public class PredictionService
 
         return await _predictionRepository.GetAllWildcardsAsync(groupId);
     }
+
+    public async Task<List<MemberPredictionsDto>> GetAllPredictionsInGroupAsync(int groupId, string userId)
+    {
+        // Verify user is a member of the group
+        if (!await _groupRepository.IsUserMemberAsync(groupId, userId))
+        {
+            throw new UnauthorizedAccessException("User is not a member of this group");
+        }
+
+        // Get all members of the group
+        var members = await _groupRepository.GetMembersAsync(groupId);
+        
+        var result = new List<MemberPredictionsDto>();
+
+        foreach (var member in members)
+        {
+            var memberPredictions = new MemberPredictionsDto
+            {
+                UserId = member.UserId,
+                DisplayName = member.DisplayName,
+                IsAdmin = member.IsAdmin,
+                DriverChampionship = await _predictionRepository.GetDriverChampionshipAsync(groupId, member.UserId),
+                ConstructorChampionship = await _predictionRepository.GetConstructorChampionshipAsync(groupId, member.UserId),
+                DriverDraft = await _predictionRepository.GetDriverDraftAsync(groupId, member.UserId),
+                Destructor = await _predictionRepository.GetDestructorAsync(groupId, member.UserId),
+                MrSaturday = await _predictionRepository.GetMrSaturdayAsync(groupId, member.UserId),
+                ZeroPointer = await _predictionRepository.GetZeroPointerAsync(groupId, member.UserId),
+                Wildcard = await _predictionRepository.GetWildcardAsync(groupId, member.UserId)
+            };
+
+            result.Add(memberPredictions);
+        }
+
+        return result;
+    }
 }

@@ -21,4 +21,11 @@ public class GroupMemberDto
     public required string DisplayName { get; set; } // Name from Clerk (fallback to username)
     public bool IsAdmin { get; set; }
     public DateTime JoinedAt { get; set; }
+    public DriverChampionshipPrediction? DriverChampionship { get; set; }
+    public ConstructorChampionshipPrediction? ConstructorChampionship { get; set; }
+    public DriverDraftPrediction? DriverDraft { get; set; }
+    public DestructorPrediction? Destructor { get; set; }
+    public MrSaturdayPrediction? MrSaturday { get; set; }
+    public ZeroPointerPrediction? ZeroPointer { get; set; }
+    public WildcardPrediction? Wildcard { get; set; }
 }
