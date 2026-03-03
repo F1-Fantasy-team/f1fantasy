@@ -14,6 +14,8 @@ import { fetchRacesForSeasonFromApi, getFirstRaceDateFromRaces } from "../api/ra
 import {
   createGroupFromApi,
   fetchMyGroupsFromApi,
+  fetchGroupDetailFromApi,
+  mapGroupDetailApiToUserPredictions,
   fetchGroupByInviteCodeFromApi,
   joinGroupFromApi,
   leaveGroupFromApi,
@@ -35,7 +37,7 @@ import type { PredictionCategoryId } from "../types/predictions";
 import { createInitialGroupPredictionsData } from "../utils/groupPredictionsData";
 import type { Group } from "../types/group";
 import type { PredictionLockMode } from "../types/group";
-import type { MemberStanding } from "../types/predictions";
+import type { MemberStanding, UserPredictions } from "../types/predictions";
 
 /** Merge API standings with group members so every member appears. Use group.members as fallback when API returns []. */
 function mergeStandingsWithGroupMembers(
@@ -114,7 +116,7 @@ export default function Index() {
       currentUserDisplayName
     );
     return { ...p, lockedUserIds: [] };
-  }, [selectedGroup?.id, currentUserId, currentUserDisplayName]);
+  }, [selectedGroup, currentUserId, currentUserDisplayName]);
 
   // Load drivers, constructors, and first race date only when user selects a group (needed for predictions view).
   // Do not include appDataLoading in deps: setting it to true would re-run the effect, cleanup would set it false, and we'd start another fetch (request loop).
@@ -203,7 +205,7 @@ export default function Index() {
     if (mergedDefault != null && groupData == null) setGroupData(mergedDefault);
   }, [mergedDefault, groupData, setGroupData]);
 
-  // When API is set, fetch only standings for the group (no prediction category GETs → no 404s for new groups).
+  // When API is set, fetch detailed group data + standings when a group is opened.
   useEffect(() => {
     if (
       !selectedGroupId ||
@@ -213,18 +215,55 @@ export default function Index() {
     )
       return;
     let cancelled = false;
-    fetchGroupStandingsOnlyFromApi(
-      selectedGroupId,
-      currentUserId,
-      currentUserDisplayName
-    ).then((result) => {
+    Promise.all([
+      fetchGroupDetailFromApi(selectedGroupId),
+      fetchGroupStandingsOnlyFromApi(
+        selectedGroupId,
+        currentUserId,
+        currentUserDisplayName
+      ),
+    ]).then(([groupDetail, result]) => {
       if (cancelled || result == null) return;
+
+      const detailedGroup: Group | null = groupDetail
+        ? {
+            id: String(groupDetail.id),
+            name: groupDetail.name,
+            memberCount: Array.isArray(groupDetail.members) ? groupDetail.members.length : 0,
+            createdAt: groupDetail.createdAt,
+            inviteCode: groupDetail.inviteCode || undefined,
+            adminUserId: groupDetail.adminUserId || undefined,
+            predictionLockMode: groupDetail.lockMode,
+            predictionsLocked: groupDetail.predictionsLocked,
+            members: groupDetail.members?.map((m) => ({
+              userId: m.userId,
+              displayName: m.displayName,
+            })),
+          }
+        : null;
+
+      const effectiveGroup = detailedGroup ?? selectedGroup;
+
+      if (detailedGroup) {
+        setUserGroups((prev) =>
+          prev.map((group) => (group.id === detailedGroup.id ? detailedGroup : group))
+        );
+        setAllGroups((prev) =>
+          prev.map((group) => (group.id === detailedGroup.id ? detailedGroup : group))
+        );
+      }
+
       const standingsWithAllMembers = mergeStandingsWithGroupMembers(
         result.standings,
-        selectedGroup,
+        effectiveGroup,
         currentUserId,
         currentUserDisplayName
       );
+
+      const detailedPredictions = groupDetail
+        ? mapGroupDetailApiToUserPredictions(groupDetail)
+        : [];
+
       setGroupData((prev) => ({
         ...(prev ?? {
           groupId: selectedGroupId,
@@ -232,10 +271,24 @@ export default function Index() {
           predictions: [],
         }),
         standings: standingsWithAllMembers,
-        predictions: (prev?.predictions ?? []).filter(
-          (p) => p.userId !== currentUserId
-        ).concat(result.predictions),
-        predictionLock: selectedGroup.predictionsLocked,
+        predictions: (() => {
+          const byUserId = new Map<string, UserPredictions>();
+
+          for (const prediction of prev?.predictions ?? []) {
+            byUserId.set(prediction.userId, prediction);
+          }
+
+          for (const prediction of detailedPredictions) {
+            byUserId.set(prediction.userId, prediction);
+          }
+
+          if (!byUserId.has(currentUserId)) {
+            byUserId.set(currentUserId, result.predictions);
+          }
+
+          return Array.from(byUserId.values());
+        })(),
+        predictionLock: effectiveGroup.predictionsLocked,
       }));
     });
     return () => {
@@ -244,10 +297,13 @@ export default function Index() {
   }, [
     isSignedIn,
     selectedGroupId,
+    selectedGroup,
     selectedGroup?.id,
     selectedGroup?.predictionsLocked,
     currentUserId,
     currentUserDisplayName,
+    setUserGroups,
+    setAllGroups,
     setGroupData,
   ]);
 

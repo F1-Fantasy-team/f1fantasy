@@ -1,6 +1,7 @@
 import { apiGet, apiPost, apiPut, apiDelete, getApiBaseUrl } from "./client";
 import type { Group } from "../types/group";
 import type { PredictionLockMode } from "../types/group";
+import type { UserPredictions } from "../types/predictions";
 
 /** Backend group member (in group response). */
 export interface GroupMemberApi {
@@ -9,7 +10,42 @@ export interface GroupMemberApi {
   userId: string;
   /** Optional display name for this user within the group. */
   displayName?: string;
+  isAdmin?: boolean;
   joinedAt: string;
+}
+
+interface RankedDriversApi {
+  rankedDriverIds?: string[];
+}
+
+interface RankedConstructorsApi {
+  rankedConstructorIds?: string[];
+}
+
+interface TwoDriverApi {
+  driver1Id?: string | null;
+  driver2Id?: string | null;
+}
+
+interface ZeroPointerApi {
+  driverIds?: string[];
+}
+
+interface WildcardApi {
+  statement?: string;
+  pointsPotential?: number;
+  fulfilled?: boolean;
+  fullfilled?: boolean;
+}
+
+export interface GroupMemberDetailApi extends GroupMemberApi {
+  driverChampionship?: RankedDriversApi | null;
+  constructorChampionship?: RankedConstructorsApi | null;
+  driverDraft?: TwoDriverApi | null;
+  destructor?: TwoDriverApi | null;
+  mrSaturday?: TwoDriverApi | null;
+  zeroPointer?: ZeroPointerApi | null;
+  wildcard?: WildcardApi | null;
 }
 
 /** Backend group response (id is number). */
@@ -23,6 +59,10 @@ export interface GroupApi {
   createdAt: string;
   lockedAt?: string | null;
   members?: GroupMemberApi[];
+}
+
+export interface GroupDetailApi extends Omit<GroupApi, "members"> {
+  members?: GroupMemberDetailApi[];
 }
 
 function mapGroupApiToGroup(api: GroupApi): Group {
@@ -40,6 +80,75 @@ function mapGroupApiToGroup(api: GroupApi): Group {
       displayName: m.displayName,
     })),
   };
+}
+
+function mapMemberPredictionApiToUserPrediction(member: GroupMemberDetailApi): UserPredictions {
+  const mapped: UserPredictions = {
+    userId: member.userId,
+    displayName: member.displayName ?? member.userId,
+  };
+
+  const rankedDriverIds = member.driverChampionship?.rankedDriverIds;
+  if (Array.isArray(rankedDriverIds) && rankedDriverIds.length > 0) {
+    mapped.driversChampionship = rankedDriverIds.map((driverId, index) => ({
+      position: index + 1,
+      driverId,
+    }));
+  }
+
+  const rankedConstructorIds = member.constructorChampionship?.rankedConstructorIds;
+  if (Array.isArray(rankedConstructorIds) && rankedConstructorIds.length > 0) {
+    mapped.constructorsChampionship = rankedConstructorIds.map((constructorId, index) => ({
+      position: index + 1,
+      constructorId,
+    }));
+  }
+
+  const draft1 = member.driverDraft?.driver1Id ?? undefined;
+  const draft2 = member.driverDraft?.driver2Id ?? undefined;
+  if (draft1 && draft2) {
+    mapped.driverDraft = {
+      driverId1: draft1,
+      driverId2: draft2,
+    };
+  }
+
+  const destructor1 = member.destructor?.driver1Id ?? undefined;
+  const destructor2 = member.destructor?.driver2Id ?? undefined;
+  if (destructor1 && destructor2) {
+    mapped.destructors = {
+      driverId1: destructor1,
+      driverId2: destructor2,
+    };
+  }
+
+  const mrSaturday1 = member.mrSaturday?.driver1Id ?? undefined;
+  const mrSaturday2 = member.mrSaturday?.driver2Id ?? undefined;
+  if (mrSaturday1 && mrSaturday2) {
+    mapped.mrSaturday = {
+      driverId1: mrSaturday1,
+      driverId2: mrSaturday2,
+    };
+  }
+
+  if (member.zeroPointer && Array.isArray(member.zeroPointer.driverIds)) {
+    mapped.zeroPointers = { driverIds: member.zeroPointer.driverIds };
+  }
+
+  if (member.wildcard?.statement) {
+    mapped.wildcard = {
+      statement: member.wildcard.statement,
+      pointsPotential: member.wildcard.pointsPotential,
+      fulfilled: member.wildcard.fulfilled ?? member.wildcard.fullfilled,
+    };
+  }
+
+  return mapped;
+}
+
+export function mapGroupDetailApiToUserPredictions(api: GroupDetailApi): UserPredictions[] {
+  if (!Array.isArray(api.members) || api.members.length === 0) return [];
+  return api.members.map(mapMemberPredictionApiToUserPrediction);
 }
 
 /**
@@ -86,6 +195,21 @@ export async function fetchGroupFromApi(groupId: string): Promise<Group | null> 
     return mapGroupApiToGroup(res);
   } catch (err) {
     if (import.meta.env.DEV) console.warn("Fetch group API failed:", err);
+    return null;
+  }
+}
+
+/**
+ * Get full group details by ID (includes member predictions).
+ * Returns null if not found or API error.
+ */
+export async function fetchGroupDetailFromApi(groupId: string): Promise<GroupDetailApi | null> {
+  if (!getApiBaseUrl()) return null;
+  try {
+    const res = await apiGet<GroupDetailApi>(`/api/groups/${groupId}`);
+    return res;
+  } catch (err) {
+    if (import.meta.env.DEV) console.warn("Fetch group detail API failed:", err);
     return null;
   }
 }
