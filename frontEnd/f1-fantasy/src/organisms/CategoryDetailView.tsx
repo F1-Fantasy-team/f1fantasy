@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useSetRecoilState, useRecoilValue } from "recoil";
 import { ArrowLeftOutlined } from "@ant-design/icons";
 import { App, InputNumber, Checkbox } from "antd";
@@ -175,7 +175,6 @@ type CategoryDetailViewProps = {
 
 export function CategoryDetailView({ group, categoryId, data, setData, currentUserId, onSavePrediction }: CategoryDetailViewProps) {
   const { message } = App.useApp();
-  const [, setWildcards] = useState<unknown | null>(null);
   const setSelectedCategoryId = useSetRecoilState(selectedCategoryIdState);
   const firstRaceDateFromRaces = useRecoilValue(firstRaceDateState);
   const drivers = useDrivers();
@@ -187,9 +186,10 @@ export function CategoryDetailView({ group, categoryId, data, setData, currentUs
       return;
     }
 
+    let cancelled = false;
+
     fetchAllWildcardsFromApi(group.id).then((list) => {
-      setWildcards(list);
-      if (!list || !Array.isArray(list) || list.length === 0) return;
+      if (cancelled || !list || !Array.isArray(list) || list.length === 0) return;
 
       // Merge group wildcards into predictions so "Everyone's predictions"
       // shows wildcard statements for all members that have one.
@@ -229,7 +229,12 @@ export function CategoryDetailView({ group, categoryId, data, setData, currentUs
         };
       });
     });
-  }, [categoryId, group.id, group.members, setData]);
+
+    return () => {
+      cancelled = true;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per group/category to avoid hammering /wildcards
+  }, [categoryId, group.id]);
 
   const myPredictions = data.predictions.find((p) => p.userId === currentUserId);
   const isLocked = isUserLocked(group, data, currentUserId, firstRaceDateFromRaces);
