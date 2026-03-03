@@ -42,8 +42,9 @@ public class GroupRepository
         // AsSplitQuery prevents cartesian explosion with multiple members
         return await _context.GroupMembers
             .Where(gm => gm.UserId == userId)
+            .Include(gm => gm.Group)
+                .ThenInclude(g => g.Members)
             .Select(gm => gm.Group)
-            .Include(g => g.Members)
             .AsSplitQuery()
             .Distinct()
             .ToListAsync();
