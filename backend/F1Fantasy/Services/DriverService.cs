@@ -206,4 +206,43 @@ public class DriverService
         _logger.LogInformation("Retrieved {Count} cached drivers", drivers.Count());
         return drivers;
     }
+
+    public async Task<IEnumerable<Driver>> GetActiveDriversAsync(string? season = null)
+    {
+        // Use current year if season not specified
+        season ??= DateTime.UtcNow.Year.ToString();
+        
+        _logger.LogDebug("Getting active drivers for season {Season}", season);
+        
+        // Check if we have any active drivers for this season
+        var activeDrivers = await _driverRepository.GetActiveDriversAsync(season);
+        
+        // If no active drivers found, fetch them from the API
+        if (!activeDrivers.Any())
+        {
+            _logger.LogInformation("No active drivers found for season {Season}. Fetching from API...", season);
+            try
+            {
+                // This will populate the ActiveSeasons list
+                await GetDriversBySeasonAsync(season);
+                
+                // Retrieve again after populating
+                activeDrivers = await _driverRepository.GetActiveDriversAsync(season);
+                _logger.LogInformation("Successfully populated {Count} active drivers for season {Season}", 
+                    activeDrivers.Count(), season);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to fetch active drivers for season {Season} from API", season);
+                throw;
+            }
+        }
+        else
+        {
+            _logger.LogDebug("Retrieved {Count} active drivers for season {Season} from cache", 
+                activeDrivers.Count(), season);
+        }
+        
+        return activeDrivers;
+    }
 }

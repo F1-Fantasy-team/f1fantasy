@@ -202,4 +202,43 @@ public class ConstructorService
         _logger.LogInformation("Retrieved {Count} cached constructors", constructors.Count());
         return constructors;
     }
+
+    public async Task<IEnumerable<Constructor>> GetActiveConstructorsAsync(string? season = null)
+    {
+        // Use current year if season not specified
+        season ??= DateTime.UtcNow.Year.ToString();
+        
+        _logger.LogDebug("Getting active constructors for season {Season}", season);
+        
+        // Check if we have any active constructors for this season
+        var activeConstructors = await _constructorRepository.GetActiveConstructorsAsync(season);
+        
+        // If no active constructors found, fetch them from the API
+        if (!activeConstructors.Any())
+        {
+            _logger.LogInformation("No active constructors found for season {Season}. Fetching from API...", season);
+            try
+            {
+                // This will populate the ActiveSeasons list
+                await GetConstructorsBySeasonAsync(season);
+                
+                // Retrieve again after populating
+                activeConstructors = await _constructorRepository.GetActiveConstructorsAsync(season);
+                _logger.LogInformation("Successfully populated {Count} active constructors for season {Season}", 
+                    activeConstructors.Count(), season);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to fetch active constructors for season {Season} from API", season);
+                throw;
+            }
+        }
+        else
+        {
+            _logger.LogDebug("Retrieved {Count} active constructors for season {Season} from cache", 
+                activeConstructors.Count(), season);
+        }
+        
+        return activeConstructors;
+    }
 }
