@@ -230,7 +230,9 @@ public class PredictionRepository
     public async Task<List<WildcardPrediction>> GetAllWildcardsAsync(int groupId)
     {
         return await _context.WildcardPredictions
+            .AsNoTracking()
             .Where(p => p.GroupId == groupId)
+            .OrderBy(p => p.UserId)
             .ToListAsync();
     }
 
