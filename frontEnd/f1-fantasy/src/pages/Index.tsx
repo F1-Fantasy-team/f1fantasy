@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useUser } from "@clerk/clerk-react";
 import { App } from "antd";
 import { useRecoilState, useSetRecoilState, useRecoilValue } from "recoil";
@@ -101,6 +101,10 @@ export default function Index() {
   const firstRaceDate = useRecoilValue(firstRaceDateState);
   const appDataLoading = useRecoilValue(appDataLoadingState);
   const selectedGroup = userGroups.find((g) => g.id === selectedGroupId);
+  // Ref to break infinite loop: after setUserGroups writes back, selectedGroup
+  // becomes a new object reference → would re-trigger the effect → DDOS.
+  const selectedGroupRef = useRef(selectedGroup);
+  selectedGroupRef.current = selectedGroup;
   const [groupData, setGroupData] = useRecoilState(
     groupPredictionsState(selectedGroupId ?? "_none")
   );
@@ -209,7 +213,7 @@ export default function Index() {
   useEffect(() => {
     if (
       !selectedGroupId ||
-      !selectedGroup ||
+      !selectedGroupRef.current ||
       !getApiBaseUrl() ||
       !isSignedIn
     )
@@ -242,7 +246,7 @@ export default function Index() {
           }
         : null;
 
-      const effectiveGroup = detailedGroup ?? selectedGroup;
+      const effectiveGroup = detailedGroup ?? selectedGroupRef.current!;
 
       if (detailedGroup) {
         setUserGroups((prev) =>
@@ -297,7 +301,6 @@ export default function Index() {
   }, [
     isSignedIn,
     selectedGroupId,
-    selectedGroup,
     selectedGroup?.id,
     selectedGroup?.predictionsLocked,
     currentUserId,
