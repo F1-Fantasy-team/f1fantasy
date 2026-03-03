@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics;
 using System.Security.Claims;
 
 namespace F1Fantasy.Controllers;
@@ -16,11 +17,13 @@ public class GroupsController : ControllerBase
 {
     private readonly GroupService _groupService;
     private readonly ClerkService _clerkService;
+    private readonly ILogger<GroupsController> _logger;
 
-    public GroupsController(GroupService groupService, ClerkService clerkService)
+    public GroupsController(GroupService groupService, ClerkService clerkService, ILogger<GroupsController> logger)
     {
         _groupService = groupService;
         _clerkService = clerkService;
+        _logger = logger;
     }
 
     private string GetUserId()
@@ -48,15 +51,26 @@ public class GroupsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetMyGroups()
     {
+        var stopwatch = Stopwatch.StartNew();
         try
         {
             var userId = GetUserId();
+            _logger.LogInformation("[GetMyGroups] Start - UserId: {UserId} - Elapsed: {Elapsed}ms", userId, stopwatch.ElapsedMilliseconds);
+            
             var groups = await _groupService.GetUserGroupsAsync(userId);
+            _logger.LogInformation("[GetMyGroups] After GetUserGroupsAsync - GroupCount: {Count} - Elapsed: {Elapsed}ms", groups.Count, stopwatch.ElapsedMilliseconds);
+            
             var groupDtos = await EnrichGroupsWithMemberNamesAsync(groups);
+            _logger.LogInformation("[GetMyGroups] After EnrichGroupsWithMemberNamesAsync - Elapsed: {Elapsed}ms", stopwatch.ElapsedMilliseconds);
+            
+            stopwatch.Stop();
+            _logger.LogInformation("[GetMyGroups] Complete - Total: {Total}ms", stopwatch.ElapsedMilliseconds);
             return Ok(groupDtos);
         }
         catch (Exception ex)
         {
+            stopwatch.Stop();
+            _logger.LogError(ex, "[GetMyGroups] Error after {Elapsed}ms: {Message}", stopwatch.ElapsedMilliseconds, ex.Message);
             return BadRequest(new { error = ex.Message });
         }
     }
@@ -276,10 +290,14 @@ public class GroupsController : ControllerBase
 
     private async Task<List<GroupDto>> EnrichGroupsWithMemberNamesAsync(List<Group> groups)
     {
+        var enrichStopwatch = Stopwatch.StartNew();
         var allUserIds = groups.SelectMany(g => g.Members.Select(m => m.UserId)).Distinct().ToList();
+        _logger.LogInformation("[EnrichGroupsWithMemberNamesAsync] Distinct UserIds: {Count}, Elapsed: {Elapsed}ms", allUserIds.Count, enrichStopwatch.ElapsedMilliseconds);
+        
         var displayNames = await _clerkService.GetUserDisplayNamesAsync(allUserIds);
+        _logger.LogInformation("[EnrichGroupsWithMemberNamesAsync] After ClerkService call - DisplayNames: {Count}, Elapsed: {Elapsed}ms", displayNames.Count, enrichStopwatch.ElapsedMilliseconds);
 
-        return groups.Select(group => new GroupDto
+        var result = groups.Select(group => new GroupDto
         {
             Id = group.Id,
             Name = group.Name,
@@ -299,6 +317,10 @@ public class GroupsController : ControllerBase
                 JoinedAt = m.JoinedAt
             }).ToList()
         }).ToList();
+        
+        enrichStopwatch.Stop();
+        _logger.LogInformation("[EnrichGroupsWithMemberNamesAsync] Complete - Total: {Elapsed}ms", enrichStopwatch.ElapsedMilliseconds);
+        return result;
     }
 }
 

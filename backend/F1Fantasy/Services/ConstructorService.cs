@@ -208,34 +208,42 @@ public class ConstructorService
         // Use current year if season not specified
         season ??= DateTime.UtcNow.Year.ToString();
         
-        _logger.LogDebug("Getting active constructors for season {Season}", season);
+        _logger.LogInformation("[GetActiveConstructorsAsync] Getting active constructors for season {Season}", season);
         
         // Check if we have any active constructors for this season
         var activeConstructors = await _constructorRepository.GetActiveConstructorsAsync(season);
+        _logger.LogInformation("[GetActiveConstructorsAsync] Initial query returned {Count} constructors for season {Season}", 
+            activeConstructors.Count(), season);
         
         // If no active constructors found, fetch them from the API
         if (!activeConstructors.Any())
         {
-            _logger.LogInformation("No active constructors found for season {Season}. Fetching from API...", season);
+            _logger.LogWarning("[GetActiveConstructorsAsync] No active constructors found for season {Season}. Attempting to fetch from API...", season);
             try
             {
                 // This will populate the ActiveSeasons list
-                await GetConstructorsBySeasonAsync(season);
+                var fetchedConstructors = await GetConstructorsBySeasonAsync(season);
+                _logger.LogInformation("[GetActiveConstructorsAsync] GetConstructorsBySeasonAsync returned {Count} constructors", fetchedConstructors.Count());
                 
                 // Retrieve again after populating
                 activeConstructors = await _constructorRepository.GetActiveConstructorsAsync(season);
-                _logger.LogInformation("Successfully populated {Count} active constructors for season {Season}", 
+                _logger.LogInformation("[GetActiveConstructorsAsync] Successfully populated {Count} active constructors for season {Season}", 
                     activeConstructors.Count(), season);
+                
+                if (!activeConstructors.Any())
+                {
+                    _logger.LogError("[GetActiveConstructorsAsync] After API fetch, still no active constructors found for season {Season}. This indicates a data population issue.", season);
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to fetch active constructors for season {Season} from API", season);
+                _logger.LogError(ex, "[GetActiveConstructorsAsync] Failed to fetch active constructors for season {Season} from API: {Message}", season, ex.Message);
                 throw;
             }
         }
         else
         {
-            _logger.LogDebug("Retrieved {Count} active constructors for season {Season} from cache", 
+            _logger.LogInformation("[GetActiveConstructorsAsync] Retrieved {Count} active constructors for season {Season} from database", 
                 activeConstructors.Count(), season);
         }
         

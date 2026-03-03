@@ -1,6 +1,7 @@
 using F1Fantasy.Models;
 using F1Fantasy.Repository;
 using F1Fantasy.Validation;
+using System.Diagnostics;
 
 namespace F1Fantasy.Services;
 
@@ -10,17 +11,20 @@ public class PredictionService
     private readonly GroupRepository _groupRepository;
     private readonly ConstructorService _constructorService;
     private readonly DriverService _driverService;
+    private readonly ILogger<PredictionService> _logger;
 
     public PredictionService(
         PredictionRepository predictionRepository,
         GroupRepository groupRepository,
         ConstructorService constructorService,
-        DriverService driverService)
+        DriverService driverService,
+        ILogger<PredictionService> logger)
     {
         _predictionRepository = predictionRepository;
         _groupRepository = groupRepository;
         _constructorService = constructorService;
         _driverService = driverService;
+        _logger = logger;
     }
 
     private async Task ValidateGroupAndLockAsync(int groupId, string userId)
@@ -46,6 +50,10 @@ public class PredictionService
     public async Task<ConstructorChampionshipPrediction> SaveConstructorChampionshipAsync(
         int groupId, string userId, List<string> rankedConstructorIds)
     {
+        var stopwatch = Stopwatch.StartNew();
+        _logger.LogInformation("[SaveConstructorChampionshipAsync] Start - GroupId: {GroupId}, UserId: {UserId}, ProvidedCount: {Count}", 
+            groupId, userId, rankedConstructorIds.Count);
+        
         await ValidateGroupAndLockAsync(groupId, userId);
 
         // Validate list size to prevent DoS attacks
@@ -58,13 +66,21 @@ public class PredictionService
             ValidationExtensions.ValidateId(id, "Constructor ID");
         }
 
+        _logger.LogInformation("[SaveConstructorChampionshipAsync] Fetching active constructors - Elapsed: {Elapsed}ms", 
+            stopwatch.ElapsedMilliseconds);
+        
         // Validate: Must have all active constructors for current season, no duplicates
         var activeConstructors = await _constructorService.GetActiveConstructorsAsync();
         var constructorIds = activeConstructors.Select(c => c.ConstructorId).ToList();
+        
+        _logger.LogInformation("[SaveConstructorChampionshipAsync] Active constructors retrieved - Count: {Count}, IDs: [{IDs}], Elapsed: {Elapsed}ms", 
+            constructorIds.Count, string.Join(", ", constructorIds), stopwatch.ElapsedMilliseconds);
 
         if (rankedConstructorIds.Count != constructorIds.Count)
         {
-            throw new ArgumentException($"Must rank all {constructorIds.Count} active constructors");
+            var errorMsg = $"Must rank all {constructorIds.Count} active constructors (you provided {rankedConstructorIds.Count}). Expected season: {DateTime.UtcNow.Year}";
+            _logger.LogWarning("[SaveConstructorChampionshipAsync] Validation failed: {Error}", errorMsg);
+            throw new ArgumentException(errorMsg);
         }
 
         if (rankedConstructorIds.Distinct().Count() != rankedConstructorIds.Count)
@@ -74,7 +90,10 @@ public class PredictionService
 
         if (rankedConstructorIds.Any(id => !constructorIds.Contains(id)))
         {
-            throw new ArgumentException("Invalid constructor IDs detected");
+            var invalidIds = rankedConstructorIds.Where(id => !constructorIds.Contains(id)).ToList();
+            var errorMsg = $"Invalid constructor IDs detected: [{string.Join(", ", invalidIds)}]";
+            _logger.LogWarning("[SaveConstructorChampionshipAsync] {Error}", errorMsg);
+            throw new ArgumentException(errorMsg);
         }
 
         var prediction = new ConstructorChampionshipPrediction
@@ -84,7 +103,10 @@ public class PredictionService
             RankedConstructorIds = rankedConstructorIds
         };
 
-        return await _predictionRepository.UpsertConstructorChampionshipAsync(prediction);
+        var result = await _predictionRepository.UpsertConstructorChampionshipAsync(prediction);
+        stopwatch.Stop();
+        _logger.LogInformation("[SaveConstructorChampionshipAsync] Complete - Total: {Elapsed}ms", stopwatch.ElapsedMilliseconds);
+        return result;
     }
 
     public async Task<ConstructorChampionshipPrediction?> GetConstructorChampionshipAsync(int groupId, string userId)
@@ -96,6 +118,10 @@ public class PredictionService
     public async Task<DriverChampionshipPrediction> SaveDriverChampionshipAsync(
         int groupId, string userId, List<string> rankedDriverIds)
     {
+        var stopwatch = Stopwatch.StartNew();
+        _logger.LogInformation("[SaveDriverChampionshipAsync] Start - GroupId: {GroupId}, UserId: {UserId}, ProvidedCount: {Count}", 
+            groupId, userId, rankedDriverIds.Count);
+        
         await ValidateGroupAndLockAsync(groupId, userId);
 
         // Validate list size to prevent DoS attacks
@@ -108,14 +134,22 @@ public class PredictionService
             ValidationExtensions.ValidateId(id, "Driver ID");
         }
 
+        _logger.LogInformation("[SaveDriverChampionshipAsync] Fetching active drivers - Elapsed: {Elapsed}ms", 
+            stopwatch.ElapsedMilliseconds);
+        
         // Validate: Must have all active drivers (typically 20), no duplicates
         var activeDrivers = await _driverService.GetActiveDriversAsync();
         var driverIds = activeDrivers.Select(d => d.DriverId).ToList();
         var expectedCount = driverIds.Count;
+        
+        _logger.LogInformation("[SaveDriverChampionshipAsync] Active drivers retrieved - Count: {Count}, IDs: [{IDs}], Elapsed: {Elapsed}ms", 
+            expectedCount, string.Join(", ", driverIds.Take(5)) + (driverIds.Count > 5 ? "..." : ""), stopwatch.ElapsedMilliseconds);
 
         if (rankedDriverIds.Count != expectedCount)
         {
-            throw new ArgumentException($"Must rank all {expectedCount} active drivers (found {rankedDriverIds.Count})");
+            var errorMsg = $"Must rank all {expectedCount} active drivers (you provided {rankedDriverIds.Count}). Expected season: {DateTime.UtcNow.Year}";
+            _logger.LogWarning("[SaveDriverChampionshipAsync] Validation failed: {Error}", errorMsg);
+            throw new ArgumentException(errorMsg);
         }
 
         if (rankedDriverIds.Distinct().Count() != rankedDriverIds.Count)
@@ -125,7 +159,10 @@ public class PredictionService
 
         if (rankedDriverIds.Any(id => !driverIds.Contains(id)))
         {
-            throw new ArgumentException("Invalid driver IDs detected");
+            var invalidIds = rankedDriverIds.Where(id => !driverIds.Contains(id)).ToList();
+            var errorMsg = $"Invalid driver IDs detected: [{string.Join(", ", invalidIds)}]";
+            _logger.LogWarning("[SaveDriverChampionshipAsync] {Error}", errorMsg);
+            throw new ArgumentException(errorMsg);
         }
 
         var prediction = new DriverChampionshipPrediction
