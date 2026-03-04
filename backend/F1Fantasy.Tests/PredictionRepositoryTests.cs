@@ -36,7 +36,10 @@ public class PredictionRepositoryTests : IDisposable
             .UseNpgsql(connectionString)
             .Options;
         _context = new F1FantasyDbContext(options);
-        _repository = new PredictionRepository(_context);
+        
+        // Create DbContextFactory for PredictionRepository
+        var contextFactory = new TestDbContextFactory(options);
+        _repository = new PredictionRepository(contextFactory);
         
         // Ensure test group exists
         CreateTestGroupAsync().Wait();
@@ -283,5 +286,26 @@ public class PredictionRepositoryTests : IDisposable
         {
             _context.Dispose();
         }
+    }
+}
+
+// Helper class for creating DbContext instances in tests
+public class TestDbContextFactory : IDbContextFactory<F1FantasyDbContext>
+{
+    private readonly DbContextOptions<F1FantasyDbContext> _options;
+
+    public TestDbContextFactory(DbContextOptions<F1FantasyDbContext> options)
+    {
+        _options = options;
+    }
+
+    public F1FantasyDbContext CreateDbContext()
+    {
+        return new F1FantasyDbContext(_options);
+    }
+
+    public async Task<F1FantasyDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
+    {
+        return await Task.FromResult(new F1FantasyDbContext(_options));
     }
 }
