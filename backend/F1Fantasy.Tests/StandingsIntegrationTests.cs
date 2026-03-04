@@ -29,6 +29,7 @@ public class StandingsIntegrationTests : IDisposable
     private readonly RaceRepository _raceRepository;
     private readonly HttpClient _httpClient;
     private readonly ResultService _resultService;
+    private readonly RaceService _raceService;
     private readonly QualifyingService _qualifyingService;
     private readonly DriverStandingService _driverStandingService;
     private readonly ConstructorStandingService _constructorStandingService;
@@ -77,6 +78,7 @@ public class StandingsIntegrationTests : IDisposable
         // Initialize HTTP client and F1 data services
         _httpClient = new HttpClient();
         _resultService = new ResultService(_httpClient, _resultRepository, _metadataRepository, _raceRepository, NullLogger<ResultService>.Instance);
+        _raceService = new RaceService(_httpClient, _raceRepository, _metadataRepository, NullLogger<RaceService>.Instance);
         _qualifyingService = new QualifyingService(_httpClient, _qualifyingRepository, NullLogger<QualifyingService>.Instance);
         _driverStandingService = new DriverStandingService(_httpClient, _driverStandingRepository, NullLogger<DriverStandingService>.Instance);
         _constructorStandingService = new ConstructorStandingService(_httpClient, _constructorStandingRepository, NullLogger<ConstructorStandingService>.Instance);
@@ -87,7 +89,8 @@ public class StandingsIntegrationTests : IDisposable
             _driverStandingService,
             _constructorStandingService,
             _resultService,
-            _qualifyingService);
+            _qualifyingService,
+            _raceService);
         
         _standingsService = new StandingsService(
             _standingRepository,
@@ -798,26 +801,5 @@ public class StandingsIntegrationTests : IDisposable
         }
 
         _context.Dispose();
-    }
-}
-
-// Helper class for creating DbContext instances in tests
-public class TestDbContextFactory : IDbContextFactory<F1FantasyDbContext>
-{
-    private readonly DbContextOptions<F1FantasyDbContext> _options;
-
-    public TestDbContextFactory(DbContextOptions<F1FantasyDbContext> options)
-    {
-        _options = options;
-    }
-
-    public F1FantasyDbContext CreateDbContext()
-    {
-        return new F1FantasyDbContext(_options);
-    }
-
-    public async Task<F1FantasyDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
-    {
-        return await Task.FromResult(new F1FantasyDbContext(_options));
     }
 }
