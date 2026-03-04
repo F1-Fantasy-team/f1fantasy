@@ -58,6 +58,7 @@ public class DriverStandingRepository
     {
         _logger.LogDebug("Fetching driver standings for season {Season}, round {Round}", season, round);
         var standings = await _context.DriverStandings
+            .AsNoTracking()
             .Where(s => s.Season == season && s.Round == round)
             .ToListAsync();
         
@@ -70,6 +71,7 @@ public class DriverStandingRepository
         
         // Get the maximum round for this season
         var maxRound = await _context.DriverStandings
+            .AsNoTracking()
             .Where(s => s.Season == season)
             .Select(s => s.Round)
             .Distinct()
@@ -91,6 +93,7 @@ public class DriverStandingRepository
             season, round, driverId);
         
         return await _context.DriverStandings
+            .AsNoTracking()
             .FirstOrDefaultAsync(s => 
                 s.Season == season && 
                 s.Round == round && 
@@ -100,7 +103,7 @@ public class DriverStandingRepository
     public async Task<IEnumerable<DriverStanding>> GetAllAsync()
     {
         _logger.LogDebug("Fetching all driver standings");
-        var standings = await _context.DriverStandings.ToListAsync();
+        var standings = await _context.DriverStandings.AsNoTracking().ToListAsync();
         
         return standings
             .OrderBy(s => s.Season)

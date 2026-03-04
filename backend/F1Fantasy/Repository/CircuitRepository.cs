@@ -32,12 +32,12 @@ public class CircuitRepository
 
     public async Task<Circuit?> GetByCircuitIdAsync(string circuitId)
     {
-        return await _context.Circuits.FirstOrDefaultAsync(c => c.CircuitId == circuitId);
+        return await _context.Circuits.AsNoTracking().FirstOrDefaultAsync(c => c.CircuitId == circuitId);
     }
 
     public async Task<IEnumerable<Circuit>> GetAllAsync()
     {
-        return await _context.Circuits.OrderBy(c => c.CircuitName).ToListAsync();
+        return await _context.Circuits.AsNoTracking().OrderBy(c => c.CircuitName).ToListAsync();
     }
 
     public async Task ClearAsync()

@@ -17,12 +17,14 @@ public class PredictionRepository
     public async Task<ConstructorChampionshipPrediction?> GetConstructorChampionshipAsync(int groupId, string userId)
     {
         return await _context.ConstructorChampionshipPredictions
+            .AsNoTracking()
             .FirstOrDefaultAsync(p => p.GroupId == groupId && p.UserId == userId);
     }
 
     public async Task<List<ConstructorChampionshipPrediction>> GetAllConstructorChampionshipsAsync(int groupId)
     {
         return await _context.ConstructorChampionshipPredictions
+            .AsNoTracking()
             .Where(p => p.GroupId == groupId)
             .ToListAsync();
     }
@@ -51,12 +53,14 @@ public class PredictionRepository
     public async Task<DriverChampionshipPrediction?> GetDriverChampionshipAsync(int groupId, string userId)
     {
         return await _context.DriverChampionshipPredictions
+            .AsNoTracking()
             .FirstOrDefaultAsync(p => p.GroupId == groupId && p.UserId == userId);
     }
 
     public async Task<List<DriverChampionshipPrediction>> GetAllDriverChampionshipsAsync(int groupId)
     {
         return await _context.DriverChampionshipPredictions
+            .AsNoTracking()
             .Where(p => p.GroupId == groupId)
             .ToListAsync();
     }
@@ -85,12 +89,14 @@ public class PredictionRepository
     public async Task<DriverDraftPrediction?> GetDriverDraftAsync(int groupId, string userId)
     {
         return await _context.DriverDraftPredictions
+            .AsNoTracking()
             .FirstOrDefaultAsync(p => p.GroupId == groupId && p.UserId == userId);
     }
 
     public async Task<List<DriverDraftPrediction>> GetAllDriverDraftsAsync(int groupId)
     {
         return await _context.DriverDraftPredictions
+            .AsNoTracking()
             .Where(p => p.GroupId == groupId)
             .ToListAsync();
     }
@@ -120,12 +126,14 @@ public class PredictionRepository
     public async Task<DestructorPrediction?> GetDestructorAsync(int groupId, string userId)
     {
         return await _context.DestructorPredictions
+            .AsNoTracking()
             .FirstOrDefaultAsync(p => p.GroupId == groupId && p.UserId == userId);
     }
 
     public async Task<List<DestructorPrediction>> GetAllDestructorsAsync(int groupId)
     {
         return await _context.DestructorPredictions
+            .AsNoTracking()
             .Where(p => p.GroupId == groupId)
             .ToListAsync();
     }
@@ -155,12 +163,14 @@ public class PredictionRepository
     public async Task<MrSaturdayPrediction?> GetMrSaturdayAsync(int groupId, string userId)
     {
         return await _context.MrSaturdayPredictions
+            .AsNoTracking()
             .FirstOrDefaultAsync(p => p.GroupId == groupId && p.UserId == userId);
     }
 
     public async Task<List<MrSaturdayPrediction>> GetAllMrSaturdaysAsync(int groupId)
     {
         return await _context.MrSaturdayPredictions
+            .AsNoTracking()
             .Where(p => p.GroupId == groupId)
             .ToListAsync();
     }
@@ -190,12 +200,14 @@ public class PredictionRepository
     public async Task<ZeroPointerPrediction?> GetZeroPointerAsync(int groupId, string userId)
     {
         return await _context.ZeroPointerPredictions
+            .AsNoTracking()
             .FirstOrDefaultAsync(p => p.GroupId == groupId && p.UserId == userId);
     }
 
     public async Task<List<ZeroPointerPrediction>> GetAllZeroPointersAsync(int groupId)
     {
         return await _context.ZeroPointerPredictions
+            .AsNoTracking()
             .Where(p => p.GroupId == groupId)
             .ToListAsync();
     }
@@ -224,6 +236,7 @@ public class PredictionRepository
     public async Task<WildcardPrediction?> GetWildcardAsync(int groupId, string userId)
     {
         return await _context.WildcardPredictions
+            .AsNoTracking()
             .FirstOrDefaultAsync(p => p.GroupId == groupId && p.UserId == userId);
     }
 
@@ -259,6 +272,7 @@ public class PredictionRepository
     }
 
     // Get all predictions for a user (for tie-breaking in standings)
+    // Note: Sequential execution required to avoid DbContext concurrency issues
     public async Task<UserPredictions> GetAllPredictionsAsync(int groupId, string userId)
     {
         return new UserPredictions

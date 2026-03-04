@@ -109,6 +109,7 @@ public class PitStopRepository
     {
         _logger.LogDebug("Fetching pit stops for season {Season}, round {Round}", season, round);
         var pitStops = await _context.PitStops
+            .AsNoTracking()
             .Where(p => p.Season == season && p.Round == round)
             .ToListAsync();
         
@@ -122,6 +123,7 @@ public class PitStopRepository
         _logger.LogDebug("Fetching pit stops for season {Season}, round {Round}, driver {DriverId}", 
             season, round, driverId);
         var pitStops = await _context.PitStops
+            .AsNoTracking()
             .Where(p => p.Season == season && p.Round == round && p.DriverId == driverId)
             .ToListAsync();
         
@@ -131,7 +133,7 @@ public class PitStopRepository
     public async Task<IEnumerable<PitStop>> GetAllAsync()
     {
         _logger.LogDebug("Fetching all pit stops");
-        var pitStops = await _context.PitStops.ToListAsync();
+        var pitStops = await _context.PitStops.AsNoTracking().ToListAsync();
         
         return pitStops
             .OrderBy(p => p.Season)

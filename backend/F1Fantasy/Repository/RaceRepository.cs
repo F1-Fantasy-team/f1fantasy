@@ -52,17 +52,19 @@ public class RaceRepository
     public async Task<Race?> GetByRoundAsync(string season, string round)
     {
         return await _context.Races
+            .AsNoTracking()
             .FirstOrDefaultAsync(r => r.Season == season && r.Round == round);
     }
 
     public async Task<IEnumerable<Race>> GetAllAsync()
     {
-        return await _context.Races.ToListAsync();
+        return await _context.Races.AsNoTracking().ToListAsync();
     }
 
     public async Task<IEnumerable<Race>> GetBySeasonAsync(string season)
     {
         return await _context.Races
+            .AsNoTracking()
             .Where(r => r.Season == season)
             .ToListAsync();
     }

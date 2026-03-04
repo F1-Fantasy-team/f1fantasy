@@ -114,6 +114,7 @@ public class QualifyingRepository
     {
         _logger.LogDebug("Fetching qualifying results for season {Season}", season);
         var qualifyings = await _context.Qualifyings
+            .AsNoTracking()
             .Where(q => q.Season == season)
             .ToListAsync();
         
@@ -126,6 +127,7 @@ public class QualifyingRepository
     {
         _logger.LogDebug("Fetching qualifying results for season {Season}, round {Round}", season, round);
         var qualifyings = await _context.Qualifyings
+            .AsNoTracking()
             .Where(q => q.Season == season && q.Round == round)
             .ToListAsync();
         
@@ -137,6 +139,7 @@ public class QualifyingRepository
         _logger.LogDebug("Fetching qualifying for season {Season}, round {Round}, driver {DriverId}", 
             season, round, driverId);
         return await _context.Qualifyings
+            .AsNoTracking()
             .FirstOrDefaultAsync(q => 
                 q.Season == season && 
                 q.Round == round && 
@@ -146,7 +149,7 @@ public class QualifyingRepository
     public async Task<IEnumerable<Qualifying>> GetAllAsync()
     {
         _logger.LogDebug("Fetching all qualifying results");
-        var qualifyings = await _context.Qualifyings.ToListAsync();
+        var qualifyings = await _context.Qualifyings.AsNoTracking().ToListAsync();
         
         return qualifyings
             .OrderBy(q => q.Season)
