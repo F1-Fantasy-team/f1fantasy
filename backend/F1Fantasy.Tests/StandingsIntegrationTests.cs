@@ -60,9 +60,12 @@ public class StandingsIntegrationTests : IDisposable
             .Options;
         _context = new F1FantasyDbContext(options);
         
+        // Create DbContextFactory for PredictionRepository
+        var contextFactory = new TestDbContextFactory(options);
+        
         // Initialize repositories
         _groupRepository = new GroupRepository(_context, NullLogger<GroupRepository>.Instance);
-        _predictionRepository = new PredictionRepository(_context);
+        _predictionRepository = new PredictionRepository(contextFactory);
         _standingRepository = new StandingRepository(_context);
         _resultRepository = new ResultRepository(_context, NullLogger<ResultRepository>.Instance);
         _qualifyingRepository = new QualifyingRepository(_context, NullLogger<QualifyingRepository>.Instance);
@@ -795,5 +798,26 @@ public class StandingsIntegrationTests : IDisposable
         }
 
         _context.Dispose();
+    }
+}
+
+// Helper class for creating DbContext instances in tests
+public class TestDbContextFactory : IDbContextFactory<F1FantasyDbContext>
+{
+    private readonly DbContextOptions<F1FantasyDbContext> _options;
+
+    public TestDbContextFactory(DbContextOptions<F1FantasyDbContext> options)
+    {
+        _options = options;
+    }
+
+    public F1FantasyDbContext CreateDbContext()
+    {
+        return new F1FantasyDbContext(_options);
+    }
+
+    public async Task<F1FantasyDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
+    {
+        return await Task.FromResult(new F1FantasyDbContext(_options));
     }
 }
