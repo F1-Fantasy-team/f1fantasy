@@ -35,6 +35,7 @@ public class ClerkService
     /// <summary>
     /// Fetches user display name from Clerk. Returns first name + last name if available, otherwise username.
     /// Falls back to the user ID if all else fails. Results are cached in memory and database for improved performance.
+    /// Uses a stale-while-revalidate strategy: if a cached name exists, it returns immediately and refreshes in the background.
     /// </summary>
     public async Task<string> GetUserDisplayNameAsync(string userId)
     {
@@ -48,19 +49,36 @@ public class ClerkService
             return cachedName;
         }
 
-        // Try to get from database cache (still fast) - handle gracefully if table doesn't exist
+        // Try to get from database cache - handle gracefully if table doesn't exist
+        UserDisplayNameCache? dbCache = null;
         try
         {
             await using var context = await _contextFactory.CreateDbContextAsync();
-            var dbCache = await context.UserDisplayNameCache
+            dbCache = await context.UserDisplayNameCache
                 .AsNoTracking()
                 .FirstOrDefaultAsync(u => u.UserId == userId);
                 
-            if (dbCache != null && dbCache.ExpiresAt > DateTime.UtcNow)
+            if (dbCache != null)
             {
-                // Cache hit in database, update memory cache and return
+                // Cache exists - return it immediately and refresh in background
                 _cache.Set(memoryCacheKey, dbCache.DisplayName, MemoryCacheDuration);
-                _logger.LogDebug("[GetUserDisplayNameAsync] Retrieved from database cache - UserId: {UserId}, Elapsed: {Elapsed}ms", userId, stopwatch.ElapsedMilliseconds);
+                _logger.LogInformation("[GetUserDisplayNameAsync] Retrieved from database cache - UserId: {UserId}, Expired: {IsExpired}, Elapsed: {Elapsed}ms", 
+                    userId, dbCache.ExpiresAt <= DateTime.UtcNow, stopwatch.ElapsedMilliseconds);
+                
+                // Fire background refresh (don't await)
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        _logger.LogDebug("[GetUserDisplayNameAsync] Background refresh started for UserId: {UserId}", userId);
+                        await FetchAndCacheFromClerkApiAsync(userId);
+                    }
+                    catch (Exception bgEx)
+                    {
+                        _logger.LogWarning(bgEx, "[GetUserDisplayNameAsync] Background refresh failed for UserId: {UserId}", userId);
+                    }
+                });
+                
                 return dbCache.DisplayName;
             }
         }
@@ -70,16 +88,24 @@ public class ClerkService
             _logger.LogWarning(dbEx, "[GetUserDisplayNameAsync] Database cache unavailable for UserId: {UserId}, falling back to API", userId);
         }
 
-        // Cache miss or expired, fetch from Clerk API
-        _logger.LogInformation("[GetUserDisplayNameAsync] Cache miss, fetching from Clerk API - UserId: {UserId}", userId);
-        
+        // No cache exists - fetch from Clerk API synchronously
+        _logger.LogInformation("[GetUserDisplayNameAsync] No cache exists, fetching from Clerk API - UserId: {UserId}", userId);
+        stopwatch.Stop();
+        return await FetchAndCacheFromClerkApiAsync(userId);
+    }
+    
+    /// <summary>
+    /// Fetches user display name from Clerk API and updates cache
+    /// </summary>
+    private async Task<string> FetchAndCacheFromClerkApiAsync(string userId)
+    {
         try
         {
             var response = await _clerkClient.Users.GetAsync(userId);
             
             if (response?.User == null)
             {
-                _logger.LogWarning("[GetUserDisplayNameAsync] User {UserId} not found in Clerk", userId);
+                _logger.LogWarning("[FetchAndCacheFromClerkApiAsync] User {UserId} not found in Clerk", userId);
                 var fallbackId = userId;
                 await UpdateCacheAsync(userId, fallbackId);
                 return fallbackId;
@@ -110,24 +136,22 @@ public class ClerkService
             }
             else
             {
-                _logger.LogWarning("[GetUserDisplayNameAsync] No name or username found for user {UserId}, using ID as display name", userId);
+                _logger.LogWarning("[FetchAndCacheFromClerkApiAsync] No name or username found for user {UserId}, using ID as display name", userId);
                 displayName = userId;
                 // Cache userId fallbacks for shorter time (1 hour) in case user updates their profile
                 await UpdateCacheAsync(userId, displayName, TimeSpan.FromHours(1));
-                stopwatch.Stop();
-                _logger.LogInformation("[GetUserDisplayNameAsync] Fetched from Clerk API - UserId: {UserId}, DisplayName: {DisplayName} (fallback), Total: {Elapsed}ms", userId, displayName, stopwatch.ElapsedMilliseconds);
+                _logger.LogInformation("[FetchAndCacheFromClerkApiAsync] Fetched from Clerk API - UserId: {UserId}, DisplayName: {DisplayName} (fallback)", userId, displayName);
                 return displayName;
             }
 
             // Update both caches with standard duration
             await UpdateCacheAsync(userId, displayName);
-            stopwatch.Stop();
-            _logger.LogInformation("[GetUserDisplayNameAsync] Fetched from Clerk API - UserId: {UserId}, DisplayName: {DisplayName}, Total: {Elapsed}ms", userId, displayName, stopwatch.ElapsedMilliseconds);
+            _logger.LogInformation("[FetchAndCacheFromClerkApiAsync] Fetched from Clerk API - UserId: {UserId}, DisplayName: {DisplayName}", userId, displayName);
             return displayName;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[GetUserDisplayNameAsync] Error fetching user {UserId} from Clerk: {Message}", userId, ex.Message);
+            _logger.LogError(ex, "[FetchAndCacheFromClerkApiAsync] Error fetching user {UserId} from Clerk: {Message}", userId, ex.Message);
             var fallbackId = userId;
             // Cache failed lookups for a shorter time
             await UpdateCacheAsync(userId, fallbackId, TimeSpan.FromMinutes(5));
@@ -175,7 +199,8 @@ public class ClerkService
     }
 
     /// <summary>
-    /// Fetches multiple user display names with optimized batch database lookup
+    /// Fetches multiple user display names with optimized batch database lookup.
+    /// Uses a stale-while-revalidate strategy: returns cached names immediately and refreshes in background.
     /// </summary>
     public async Task<Dictionary<string, string>> GetUserDisplayNamesAsync(IEnumerable<string> userIds)
     {
@@ -186,14 +211,14 @@ public class ClerkService
         
         _logger.LogInformation("[GetUserDisplayNamesAsync] Fetching {Count} unique user display names", uniqueUserIds.Count);
         
-        // First, try to get all from database cache in one query
+        // First, try to get all from database cache in one query (ignore expiration)
         List<UserDisplayNameCache> cachedUsers;
         try
         {
             await using var context = await _contextFactory.CreateDbContextAsync();
             cachedUsers = await context.UserDisplayNameCache
                 .AsNoTracking()
-                .Where(u => uniqueUserIds.Contains(u.UserId) && u.ExpiresAt > DateTime.UtcNow)
+                .Where(u => uniqueUserIds.Contains(u.UserId))
                 .ToListAsync();
         }
         catch (Exception ex)
@@ -205,24 +230,60 @@ public class ClerkService
         _logger.LogInformation("[GetUserDisplayNamesAsync] Found {Count} users in database cache - Elapsed: {Elapsed}ms", 
             cachedUsers.Count, stopwatch.ElapsedMilliseconds);
         
+        // Separate cached users into fresh and stale
+        var staleUserIds = new List<string>();
         foreach (var cached in cachedUsers)
         {
             result[cached.UserId] = cached.DisplayName;
             // Also update memory cache
             _cache.Set($"clerk_user_{cached.UserId}", cached.DisplayName, MemoryCacheDuration);
+            
+            // Track stale entries for background refresh
+            if (cached.ExpiresAt <= DateTime.UtcNow)
+            {
+                staleUserIds.Add(cached.UserId);
+            }
         }
         
-        // Find which users are not cached
+        // Fire background refresh for stale cached users (don't await)
+        if (staleUserIds.Any())
+        {
+            _logger.LogInformation("[GetUserDisplayNamesAsync] Triggering background refresh for {Count} stale users", staleUserIds.Count);
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var tasks = staleUserIds.Select(async userId =>
+                    {
+                        try
+                        {
+                            await FetchAndCacheFromClerkApiAsync(userId);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "[GetUserDisplayNamesAsync] Background refresh failed for UserId: {UserId}", userId);
+                        }
+                    });
+                    await Task.WhenAll(tasks);
+                }
+                catch (Exception bgEx)
+                {
+                    _logger.LogWarning(bgEx, "[GetUserDisplayNamesAsync] Background refresh batch failed");
+                }
+            });
+        }
+        
+        // Find which users are not cached at all
         uncachedUserIds = uniqueUserIds.Except(result.Keys).ToList();
         
         if (uncachedUserIds.Any())
         {
             _logger.LogInformation("[GetUserDisplayNamesAsync] Fetching {Count} uncached users from Clerk API", uncachedUserIds.Count);
             
-            // Fetch uncached users from Clerk API in parallel
+            // Fetch uncached users from Clerk API in parallel (await these)
             var tasks = uncachedUserIds.Select(async userId =>
             {
-                var displayName = await GetUserDisplayNameAsync(userId);
+                var displayName = await FetchAndCacheFromClerkApiAsync(userId);
                 return new { UserId = userId, DisplayName = displayName };
             });
 
@@ -235,8 +296,8 @@ public class ClerkService
         }
         
         stopwatch.Stop();
-        _logger.LogInformation("[GetUserDisplayNamesAsync] Complete - Total: {Total}ms, DB Cache Hits: {CacheHits}, API Calls: {ApiCalls}", 
-            stopwatch.ElapsedMilliseconds, cachedUsers.Count, uncachedUserIds.Count);
+        _logger.LogInformation("[GetUserDisplayNamesAsync] Complete - Total: {Total}ms, Cached: {Cached}, Stale: {Stale}, Uncached: {Uncached}", 
+            stopwatch.ElapsedMilliseconds, cachedUsers.Count, staleUserIds.Count, uncachedUserIds.Count);
         
         return result;
     }
