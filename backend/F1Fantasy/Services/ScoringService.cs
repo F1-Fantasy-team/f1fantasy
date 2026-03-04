@@ -11,6 +11,7 @@ public class ScoringService
     private readonly ConstructorStandingService _constructorStandingService;
     private readonly ResultService _resultService;
     private readonly QualifyingService _qualifyingService;
+    private readonly RaceService _raceService;
 
     // Scoring constants
     private const int CHAMPIONSHIP_EXACT_MATCH_POINTS = 10;
@@ -25,13 +26,15 @@ public class ScoringService
         DriverStandingService driverStandingService,
         ConstructorStandingService constructorStandingService,
         ResultService resultService,
-        QualifyingService qualifyingService)
+        QualifyingService qualifyingService,
+        RaceService raceService)
     {
         _predictionRepository = predictionRepository;
         _driverStandingService = driverStandingService;
         _constructorStandingService = constructorStandingService;
         _resultService = resultService;
         _qualifyingService = qualifyingService;
+        _raceService = raceService;
     }
 
     /// <summary>
@@ -193,6 +196,21 @@ public class ScoringService
         var prediction = await _predictionRepository.GetZeroPointerAsync(groupId, userId);
         if (prediction == null || prediction.DriverIds == null || !prediction.DriverIds.Any()) return 0;
 
+        // Zero Pointer should only score at the END OF THE SEASON
+        // Get total races for the season
+        var allRaces = await _raceService.GetRacesForSeasonAsync(season);
+        var totalRaces = allRaces.Count();
+        
+        // Get latest round with results
+        var latestRound = await _resultService.GetLatestRoundWithResultsAsync(season);
+        
+        // If season is not complete, return 0 (no points yet)
+        if (!latestRound.HasValue || latestRound.Value < totalRaces)
+        {
+            return 0;
+        }
+
+        // Season is complete - calculate Zero Pointer scores
         // Use cache-first method for better performance
         var standingsList = await _driverStandingService.GetDriverStandingsBySeasonCachedAsync(season);
         if (standingsList?.DriverStandings == null) return 0;
