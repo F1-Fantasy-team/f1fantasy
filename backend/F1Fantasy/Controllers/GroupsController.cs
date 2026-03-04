@@ -289,14 +289,31 @@ public class GroupsController : ControllerBase
 
     private async Task<GroupDto> EnrichGroupWithMemberNamesAndPredictionsAsync(Group group)
     {
-        var userIds = group.Members.Select(m => m.UserId).ToList();
-        var displayNames = await _clerkService.GetUserDisplayNamesAsync(userIds);
-
-        var members = new List<GroupMemberDto>();
+        var stopwatch = Stopwatch.StartNew();
+        _logger.LogInformation("[EnrichGroupWithMemberNamesAndPredictionsAsync] Start - GroupId: {GroupId}, MemberCount: {Count}", 
+            group.Id, group.Members.Count);
         
-        foreach (var member in group.Members)
+        var userIds = group.Members.Select(m => m.UserId).ToList();
+        
+        // Fetch display names
+        var displayNamesTask = _clerkService.GetUserDisplayNamesAsync(userIds);
+        
+        // Fetch ALL predictions for the group in one bulk operation (7 parallel queries)
+        var predictionsTask = _predictionService.GetAllPredictionsForGroupAsync(group.Id);
+        
+        await Task.WhenAll(displayNamesTask, predictionsTask);
+        
+        var displayNames = await displayNamesTask;
+        var allPredictions = await predictionsTask;
+        
+        _logger.LogInformation("[EnrichGroupWithMemberNamesAndPredictionsAsync] After bulk fetch - Elapsed: {Elapsed}ms", 
+            stopwatch.ElapsedMilliseconds);
+
+        var members = group.Members.Select(member =>
         {
-            var memberDto = new GroupMemberDto
+            var userPredictions = allPredictions.GetValueOrDefault(member.UserId);
+            
+            return new GroupMemberDto
             {
                 Id = member.Id,
                 GroupId = member.GroupId,
@@ -304,16 +321,19 @@ public class GroupsController : ControllerBase
                 DisplayName = displayNames.GetValueOrDefault(member.UserId, member.UserId),
                 IsAdmin = member.UserId == group.AdminUserId,
                 JoinedAt = member.JoinedAt,
-                DriverChampionship = await _predictionService.GetDriverChampionshipAsync(group.Id, member.UserId),
-                ConstructorChampionship = await _predictionService.GetConstructorChampionshipAsync(group.Id, member.UserId),
-                DriverDraft = await _predictionService.GetDriverDraftAsync(group.Id, member.UserId),
-                Destructor = await _predictionService.GetDestructorAsync(group.Id, member.UserId),
-                MrSaturday = await _predictionService.GetMrSaturdayAsync(group.Id, member.UserId),
-                ZeroPointer = await _predictionService.GetZeroPointerAsync(group.Id, member.UserId),
-                Wildcard = await _predictionService.GetWildcardAsync(group.Id, member.UserId)
+                DriverChampionship = userPredictions?.DriverChampionship,
+                ConstructorChampionship = userPredictions?.ConstructorChampionship,
+                DriverDraft = userPredictions?.DriverDraft,
+                Destructor = userPredictions?.Destructor,
+                MrSaturday = userPredictions?.MrSaturday,
+                ZeroPointer = userPredictions?.ZeroPointer,
+                Wildcard = userPredictions?.Wildcard
             };
-            members.Add(memberDto);
-        }
+        }).ToList();
+
+        stopwatch.Stop();
+        _logger.LogInformation("[EnrichGroupWithMemberNamesAndPredictionsAsync] Complete - Total: {Elapsed}ms", 
+            stopwatch.ElapsedMilliseconds);
 
         return new GroupDto
         {

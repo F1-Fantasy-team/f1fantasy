@@ -62,6 +62,65 @@ public class ResultRepository
         }
     }
 
+    public async Task AddOrUpdateBatchAsync(IEnumerable<Result> results, string season, string round)
+    {
+        var resultList = results.ToList();
+        if (!resultList.Any()) return;
+
+        try
+        {
+            var driverIds = resultList.Select(r => r.DriverId).ToList();
+            var isSprint = resultList.First().IsSprint;
+
+            // Single query to get all existing results for this season/round
+            var existingResults = await _context.Results
+                .Where(r => r.Season == season && r.Round == round && 
+                            driverIds.Contains(r.DriverId) && r.IsSprint == isSprint)
+                .ToDictionaryAsync(r => r.DriverId);
+
+            var updatedCount = 0;
+            var addedCount = 0;
+
+            foreach (var result in resultList)
+            {
+                if (existingResults.TryGetValue(result.DriverId, out var existing))
+                {
+                    // Update existing
+                    existing.Number = result.Number;
+                    existing.Position = result.Position;
+                    existing.PositionText = result.PositionText;
+                    existing.Points = result.Points;
+                    existing.ConstructorId = result.ConstructorId;
+                    existing.Grid = result.Grid;
+                    existing.Laps = result.Laps;
+                    existing.Status = result.Status;
+                    existing.Time = result.Time;
+                    existing.FastestLap = result.FastestLap;
+                    _context.Results.Update(existing);
+                    updatedCount++;
+                }
+                else
+                {
+                    // Add new
+                    result.Season = season;
+                    result.Round = round;
+                    await _context.Results.AddAsync(result);
+                    addedCount++;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            
+            _logger.LogInformation("Batch saved {ResultType} for season {Season}, round {Round}: {Added} added, {Updated} updated",
+                isSprint ? "sprint results" : "race results", season, round, addedCount, updatedCount);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error batch saving results for season {Season}, round {Round}", season, round);
+            throw;
+        }
+    }
+
     public async Task<IEnumerable<Result>> GetBySeasonAsync(string season)
     {
         _logger.LogDebug("Fetching results for season {Season}", season);

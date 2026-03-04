@@ -232,15 +232,27 @@ public class ScoringService
 
     public async Task<Dictionary<string, int>> CalculateAllCategoryScoresAsync(int groupId, string userId, string season)
     {
+        // Parallelize all independent score calculations
+        var constructorChampTask = CalculateConstructorChampionshipScoreAsync(groupId, userId, season);
+        var driverChampTask = CalculateDriverChampionshipScoreAsync(groupId, userId, season);
+        var driverDraftTask = CalculateDriverDraftScoreAsync(groupId, userId, season);
+        var destructorTask = CalculateDestructorScoreAsync(groupId, userId, season);
+        var mrSaturdayTask = CalculateMrSaturdayScoreAsync(groupId, userId, season);
+        var zeroPointerTask = CalculateZeroPointerScoreAsync(groupId, userId, season);
+        var wildcardTask = CalculateWildcardScoreAsync(groupId, userId);
+
+        await Task.WhenAll(constructorChampTask, driverChampTask, driverDraftTask, destructorTask, 
+            mrSaturdayTask, zeroPointerTask, wildcardTask);
+
         return new Dictionary<string, int>
         {
-            ["constructorChampionship"] = await CalculateConstructorChampionshipScoreAsync(groupId, userId, season),
-            ["driverChampionship"] = await CalculateDriverChampionshipScoreAsync(groupId, userId, season),
-            ["driverDraft"] = await CalculateDriverDraftScoreAsync(groupId, userId, season),
-            ["destructor"] = await CalculateDestructorScoreAsync(groupId, userId, season),
-            ["mrSaturday"] = await CalculateMrSaturdayScoreAsync(groupId, userId, season),
-            ["zeroPointer"] = await CalculateZeroPointerScoreAsync(groupId, userId, season),
-            ["wildcard"] = await CalculateWildcardScoreAsync(groupId, userId)
+            ["constructorChampionship"] = await constructorChampTask,
+            ["driverChampionship"] = await driverChampTask,
+            ["driverDraft"] = await driverDraftTask,
+            ["destructor"] = await destructorTask,
+            ["mrSaturday"] = await mrSaturdayTask,
+            ["zeroPointer"] = await zeroPointerTask,
+            ["wildcard"] = await wildcardTask
         };
     }
 
@@ -332,10 +344,16 @@ public class ScoringService
                 CategoryScores = new Dictionary<string, int>()
             };
 
-            // For Driver Draft, Destructor, MrSaturday - calculate points earned in this specific round
-            var destructorPoints = await CalculateDestructorScoreForRoundAsync(groupId, userId, season, raceInfo.Round);
-            var mrSaturdayPoints = await CalculateMrSaturdayScoreForRoundAsync(groupId, userId, season, raceInfo.Round);
-            var driverDraftPoints = await CalculateDriverDraftScoreForRoundAsync(groupId, userId, season, raceInfo.Round);
+            // Parallelize per-round score calculations
+            var destructorTask = CalculateDestructorScoreForRoundAsync(groupId, userId, season, raceInfo.Round);
+            var mrSaturdayTask = CalculateMrSaturdayScoreForRoundAsync(groupId, userId, season, raceInfo.Round);
+            var driverDraftTask = CalculateDriverDraftScoreForRoundAsync(groupId, userId, season, raceInfo.Round);
+
+            await Task.WhenAll(destructorTask, mrSaturdayTask, driverDraftTask);
+
+            var destructorPoints = await destructorTask;
+            var mrSaturdayPoints = await mrSaturdayTask;
+            var driverDraftPoints = await driverDraftTask;
 
             roundScore.CategoryScores["Destructor"] = destructorPoints;
             roundScore.CategoryScores["MrSaturday"] = mrSaturdayPoints;
@@ -360,13 +378,20 @@ public class ScoringService
         // Add end-of-season categories to the last round (if races exist)
         if (roundScores.Any())
         {
-            var driverChampPoints = await CalculateDriverChampionshipScoreAsync(groupId, userId, season);
-            var constructorChampPoints = await CalculateConstructorChampionshipScoreAsync(groupId, userId, season);
-            var zeroPointerPoints = await CalculateZeroPointerScoreAsync(groupId, userId, season);
-            var wildcardPoints = await CalculateWildcardScoreAsync(groupId, userId);
-            
-            // Driver Draft should be based on FINAL season standings, not accumulated per round
-            var driverDraftSeasonTotal = await CalculateDriverDraftScoreAsync(groupId, userId, season);
+            // Parallelize season-end score calculations
+            var driverChampTask = CalculateDriverChampionshipScoreAsync(groupId, userId, season);
+            var constructorChampTask = CalculateConstructorChampionshipScoreAsync(groupId, userId, season);
+            var zeroPointerTask = CalculateZeroPointerScoreAsync(groupId, userId, season);
+            var wildcardTask = CalculateWildcardScoreAsync(groupId, userId);
+            var driverDraftSeasonTask = CalculateDriverDraftScoreAsync(groupId, userId, season);
+
+            await Task.WhenAll(driverChampTask, constructorChampTask, zeroPointerTask, wildcardTask, driverDraftSeasonTask);
+
+            var driverChampPoints = await driverChampTask;
+            var constructorChampPoints = await constructorChampTask;
+            var zeroPointerPoints = await zeroPointerTask;
+            var wildcardPoints = await wildcardTask;
+            var driverDraftSeasonTotal = await driverDraftSeasonTask;
 
             var lastRound = roundScores[^1];
             lastRound.CategoryScores["DriverChampionship"] = driverChampPoints;

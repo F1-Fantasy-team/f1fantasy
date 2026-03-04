@@ -376,4 +376,68 @@ public class PredictionService
 
         return await _predictionRepository.GetAllWildcardsAsync(groupId);
     }
+
+    // Bulk fetch all predictions for a group (eliminates N+1 queries)
+    public async Task<Dictionary<string, UserPredictions>> GetAllPredictionsForGroupAsync(int groupId)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        _logger.LogInformation("[GetAllPredictionsForGroupAsync] Start - GroupId: {GroupId}", groupId);
+
+        // Fetch all prediction types in parallel
+        var driverChampTask = _predictionRepository.GetAllDriverChampionshipsAsync(groupId);
+        var constructorChampTask = _predictionRepository.GetAllConstructorChampionshipsAsync(groupId);
+        var driverDraftTask = _predictionRepository.GetAllDriverDraftsAsync(groupId);
+        var destructorTask = _predictionRepository.GetAllDestructorsAsync(groupId);
+        var mrSaturdayTask = _predictionRepository.GetAllMrSaturdaysAsync(groupId);
+        var zeroPointerTask = _predictionRepository.GetAllZeroPointersAsync(groupId);
+        var wildcardTask = _predictionRepository.GetAllWildcardsAsync(groupId);
+
+        await Task.WhenAll(
+            driverChampTask, constructorChampTask, driverDraftTask,
+            destructorTask, mrSaturdayTask, zeroPointerTask, wildcardTask
+        );
+
+        _logger.LogInformation("[GetAllPredictionsForGroupAsync] All queries complete - Elapsed: {Elapsed}ms", 
+            stopwatch.ElapsedMilliseconds);
+
+        // Organize by userId
+        var driverChamps = await driverChampTask;
+        var constructorChamps = await constructorChampTask;
+        var driverDrafts = await driverDraftTask;
+        var destructors = await destructorTask;
+        var mrSaturdays = await mrSaturdayTask;
+        var zeroPointers = await zeroPointerTask;
+        var wildcards = await wildcardTask;
+
+        // Get all unique user IDs
+        var allUserIds = new HashSet<string>();
+        allUserIds.UnionWith(driverChamps.Select(p => p.UserId));
+        allUserIds.UnionWith(constructorChamps.Select(p => p.UserId));
+        allUserIds.UnionWith(driverDrafts.Select(p => p.UserId));
+        allUserIds.UnionWith(destructors.Select(p => p.UserId));
+        allUserIds.UnionWith(mrSaturdays.Select(p => p.UserId));
+        allUserIds.UnionWith(zeroPointers.Select(p => p.UserId));
+        allUserIds.UnionWith(wildcards.Select(p => p.UserId));
+
+        // Build dictionary
+        var result = allUserIds.ToDictionary(
+            userId => userId,
+            userId => new UserPredictions
+            {
+                DriverChampionship = driverChamps.FirstOrDefault(p => p.UserId == userId),
+                ConstructorChampionship = constructorChamps.FirstOrDefault(p => p.UserId == userId),
+                DriverDraft = driverDrafts.FirstOrDefault(p => p.UserId == userId),
+                Destructor = destructors.FirstOrDefault(p => p.UserId == userId),
+                MrSaturday = mrSaturdays.FirstOrDefault(p => p.UserId == userId),
+                ZeroPointer = zeroPointers.FirstOrDefault(p => p.UserId == userId),
+                Wildcard = wildcards.FirstOrDefault(p => p.UserId == userId)
+            }
+        );
+
+        stopwatch.Stop();
+        _logger.LogInformation("[GetAllPredictionsForGroupAsync] Complete - UserCount: {Count}, Total: {Elapsed}ms", 
+            result.Count, stopwatch.ElapsedMilliseconds);
+
+        return result;
+    }
 }

@@ -57,7 +57,7 @@ public class DatabaseIntegrationTests : IAsyncLifetime
         _raceRepository = new RaceRepository(_context, NullLogger<RaceRepository>.Instance);
         _seasonRepository = new SeasonRepository(_context);
         _circuitRepository = new CircuitRepository(_context);
-        _constructorRepository = new ConstructorRepository(_context);
+        _constructorRepository = new ConstructorRepository(_context, NullLogger<ConstructorRepository>.Instance);
         _driverRepository = new DriverRepository(_context, NullLogger<DriverRepository>.Instance);
     }
 

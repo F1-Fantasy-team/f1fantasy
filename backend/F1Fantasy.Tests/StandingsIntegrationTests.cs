@@ -61,7 +61,7 @@ public class StandingsIntegrationTests : IDisposable
         _context = new F1FantasyDbContext(options);
         
         // Initialize repositories
-        _groupRepository = new GroupRepository(_context);
+        _groupRepository = new GroupRepository(_context, NullLogger<GroupRepository>.Instance);
         _predictionRepository = new PredictionRepository(_context);
         _standingRepository = new StandingRepository(_context);
         _resultRepository = new ResultRepository(_context, NullLogger<ResultRepository>.Instance);

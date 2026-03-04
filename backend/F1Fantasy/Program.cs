@@ -92,8 +92,6 @@ builder.Services.AddDbContext<F1FantasyDbContext>(options =>
     var poolingParams = "Pooling=true;Minimum Pool Size=10;Maximum Pool Size=100;Connection Idle Lifetime=60;Connection Pruning Interval=5";
     connString = connString.TrimEnd(';') + ";" + poolingParams;
     
-    builder.Logging.LogInformation("Database connection with pooling: Min=10, Max=100, IdleLifetime=60s");
-    
     options.UseNpgsql(connString, npgsqlOptions =>
     {
         // Set command timeout to prevent long-running queries (30 seconds)

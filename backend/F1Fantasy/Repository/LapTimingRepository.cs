@@ -54,6 +54,55 @@ public class LapTimingRepository
         }
     }
 
+    public async Task AddOrUpdateBatchAsync(IEnumerable<LapTiming> lapTimings, string season, string round)
+    {
+        var lapTimingList = lapTimings.ToList();
+        if (!lapTimingList.Any()) return;
+
+        try
+        {
+            // Single query to get all existing lap timings for this season/round
+            var existingLapTimings = await _context.LapTimings
+                .Where(l => l.Season == season && l.Round == round)
+                .ToListAsync();
+
+            var existingDict = existingLapTimings.ToDictionary(l => (l.LapNumber, l.DriverId));
+
+            var updatedCount = 0;
+            var addedCount = 0;
+
+            foreach (var lapTiming in lapTimingList)
+            {
+                if (existingDict.TryGetValue((lapTiming.LapNumber, lapTiming.DriverId), out var existing))
+                {
+                    // Update existing
+                    existing.Position = lapTiming.Position;
+                    existing.Time = lapTiming.Time;
+                    _context.LapTimings.Update(existing);
+                    updatedCount++;
+                }
+                else
+                {
+                    // Add new
+                    lapTiming.Season = season;
+                    lapTiming.Round = round;
+                    await _context.LapTimings.AddAsync(lapTiming);
+                    addedCount++;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            
+            _logger.LogInformation("Batch saved lap timings for season {Season}, round {Round}: {Added} added, {Updated} updated",
+                season, round, addedCount, updatedCount);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error batch saving lap timings for season {Season}, round {Round}", season, round);
+            throw;
+        }
+    }
+
     public async Task<IEnumerable<LapTiming>> GetByRaceAsync(string season, string round)
     {
         _logger.LogDebug("Fetching lap timings for season {Season}, round {Round}", season, round);
