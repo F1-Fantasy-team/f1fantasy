@@ -125,6 +125,7 @@ public class ResultRepository
     {
         _logger.LogDebug("Fetching results for season {Season}", season);
         var results = await _context.Results
+            .AsNoTracking()
             .Where(r => r.Season == season && !r.IsSprint)
             .ToListAsync();
         
@@ -137,6 +138,7 @@ public class ResultRepository
     {
         _logger.LogDebug("Fetching sprint results for season {Season}", season);
         var results = await _context.Results
+            .AsNoTracking()
             .Where(r => r.Season == season && r.IsSprint)
             .ToListAsync();
         
@@ -149,6 +151,7 @@ public class ResultRepository
     {
         _logger.LogDebug("Fetching results for season {Season}, round {Round}", season, round);
         var results = await _context.Results
+            .AsNoTracking()
             .Where(r => r.Season == season && r.Round == round && !r.IsSprint)
             .ToListAsync();
         
@@ -159,6 +162,7 @@ public class ResultRepository
     {
         _logger.LogDebug("Fetching sprint results for season {Season}, round {Round}", season, round);
         var results = await _context.Results
+            .AsNoTracking()
             .Where(r => r.Season == season && r.Round == round && r.IsSprint)
             .ToListAsync();
         
@@ -170,6 +174,7 @@ public class ResultRepository
         _logger.LogDebug("Fetching result for season {Season}, round {Round}, driver {DriverId}", 
             season, round, driverId);
         return await _context.Results
+            .AsNoTracking()
             .FirstOrDefaultAsync(r => 
                 r.Season == season && 
                 r.Round == round && 
@@ -179,7 +184,7 @@ public class ResultRepository
     public async Task<IEnumerable<Result>> GetAllAsync()
     {
         _logger.LogDebug("Fetching all results");
-        var results = await _context.Results.ToListAsync();
+        var results = await _context.Results.AsNoTracking().ToListAsync();
         
         return results
             .OrderBy(r => r.Season)
@@ -192,6 +197,7 @@ public class ResultRepository
         _logger.LogDebug("Getting latest round with results for season {Season}", season);
         
         var rounds = await _context.Results
+            .AsNoTracking()
             .Where(r => r.Season == season && !r.IsSprint)
             .Select(r => r.Round)
             .Distinct()

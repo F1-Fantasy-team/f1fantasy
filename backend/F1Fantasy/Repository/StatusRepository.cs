@@ -40,18 +40,20 @@ public class StatusRepository
     public async Task<Status?> GetByIdAsync(string statusId)
     {
         return await _context.Statuses
+            .AsNoTracking()
             .FirstOrDefaultAsync(s => s.StatusId == statusId);
     }
 
     public async Task<Status?> GetByTextAsync(string statusText)
     {
         return await _context.Statuses
+            .AsNoTracking()
             .FirstOrDefaultAsync(s => s.StatusText == statusText);
     }
 
     public async Task<List<Status>> GetAllAsync()
     {
-        var statuses = await _context.Statuses.ToListAsync();
+        var statuses = await _context.Statuses.AsNoTracking().ToListAsync();
         
         // Sort by count (most common first), then by status text
         return statuses

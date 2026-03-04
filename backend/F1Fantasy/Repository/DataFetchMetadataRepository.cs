@@ -18,6 +18,7 @@ public class DataFetchMetadataRepository
     public async Task<DataFetchMetadata?> GetMetadataAsync(string season, string dataType)
     {
         return await _context.DataFetchMetadata
+            .AsNoTracking()
             .FirstOrDefaultAsync(m => m.Season == season && m.DataType == dataType);
     }
 

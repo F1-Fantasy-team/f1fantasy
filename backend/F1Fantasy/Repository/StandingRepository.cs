@@ -16,12 +16,14 @@ public class StandingRepository
     public async Task<Standing?> GetByUserAndGroupAsync(int groupId, string userId)
     {
         return await _context.Standings
+            .AsNoTracking()
             .FirstOrDefaultAsync(s => s.GroupId == groupId && s.UserId == userId);
     }
 
     public async Task<List<Standing>> GetStandingsByGroupAsync(int groupId)
     {
         return await _context.Standings
+            .AsNoTracking()
             .Where(s => s.GroupId == groupId)
             .OrderBy(s => s.Rank)
             .ToListAsync();

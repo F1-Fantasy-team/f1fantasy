@@ -31,12 +31,12 @@ public class SeasonRepository
 
     public async Task<Season?> GetByYearAsync(string year)
     {
-        return await _context.Seasons.FirstOrDefaultAsync(s => s.Year == year);
+        return await _context.Seasons.AsNoTracking().FirstOrDefaultAsync(s => s.Year == year);
     }
 
     public async Task<IEnumerable<Season>> GetAllAsync()
     {
-        return await _context.Seasons.OrderBy(s => s.Year).ToListAsync();
+        return await _context.Seasons.AsNoTracking().OrderBy(s => s.Year).ToListAsync();
     }
 
     public async Task ClearAsync()

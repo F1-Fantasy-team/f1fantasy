@@ -107,6 +107,7 @@ public class LapTimingRepository
     {
         _logger.LogDebug("Fetching lap timings for season {Season}, round {Round}", season, round);
         var lapTimings = await _context.LapTimings
+            .AsNoTracking()
             .Where(l => l.Season == season && l.Round == round)
             .ToListAsync();
         
@@ -120,6 +121,7 @@ public class LapTimingRepository
         _logger.LogDebug("Fetching lap timings for season {Season}, round {Round}, lap {Lap}", 
             season, round, lapNumber);
         var lapTimings = await _context.LapTimings
+            .AsNoTracking()
             .Where(l => l.Season == season && l.Round == round && l.LapNumber == lapNumber)
             .ToListAsync();
         
@@ -131,6 +133,7 @@ public class LapTimingRepository
         _logger.LogDebug("Fetching lap timings for season {Season}, round {Round}, driver {DriverId}", 
             season, round, driverId);
         var lapTimings = await _context.LapTimings
+            .AsNoTracking()
             .Where(l => l.Season == season && l.Round == round && l.DriverId == driverId)
             .ToListAsync();
         
@@ -140,7 +143,7 @@ public class LapTimingRepository
     public async Task<IEnumerable<LapTiming>> GetAllAsync()
     {
         _logger.LogDebug("Fetching all lap timings");
-        var lapTimings = await _context.LapTimings.ToListAsync();
+        var lapTimings = await _context.LapTimings.AsNoTracking().ToListAsync();
         
         return lapTimings
             .OrderBy(l => l.Season)
