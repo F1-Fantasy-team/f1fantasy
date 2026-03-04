@@ -53,13 +53,10 @@ public class PitStopService
             _logger.LogInformation("Retrieved {Count} pit stops for season {Season}, round {Round} from API", 
                 race.PitStops?.Count ?? 0, season, round);
 
-            // Store pit stops in repository
-            if (race.PitStops != null)
+            // Store pit stops in repository using batch operation
+            if (race.PitStops != null && race.PitStops.Any())
             {
-                foreach (var pitStop in race.PitStops)
-                {
-                    await _pitStopRepository.AddOrUpdateAsync(pitStop, race.Season, race.Round);
-                }
+                await _pitStopRepository.AddOrUpdateBatchAsync(race.PitStops, race.Season, race.Round);
             }
 
             return race;

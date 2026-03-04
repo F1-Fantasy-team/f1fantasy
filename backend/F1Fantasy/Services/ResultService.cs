@@ -49,18 +49,20 @@ public class ResultService
             var races = apiResponse.MRData.RaceTable.Races;
             _logger.LogInformation("Retrieved results for {Count} races in season {Season} from API", races.Count, season);
 
-            // Store results in repository
+            // Store results in repository using batch operations
             foreach (var race in races)
             {
-                if (race.Results != null)
+                if (race.Results != null && race.Results.Any())
                 {
+                    // Populate IDs from nested objects
                     foreach (var result in race.Results)
                     {
-                        // Populate IDs from nested objects
                         result.DriverId = result.Driver?.DriverId ?? result.DriverId;
                         result.ConstructorId = result.Constructor?.ConstructorId ?? result.ConstructorId;
-                        await _resultRepository.AddOrUpdateAsync(result, race.Season, race.Round);
                     }
+                    
+                    // Batch save all results for this race
+                    await _resultRepository.AddOrUpdateBatchAsync(race.Results, race.Season, race.Round);
                 }
             }
 
@@ -195,20 +197,21 @@ public class ResultService
             var races = apiResponse.MRData.RaceTable.Races;
             _logger.LogInformation("Retrieved sprint results for {Count} races in season {Season} from API", races.Count, season);
 
-            // Store sprint results in repository
+            // Store sprint results in repository using batch operations
             foreach (var race in races)
             {
-                if (race.SprintResults != null)
+                if (race.SprintResults != null && race.SprintResults.Any())
                 {
+                    // Populate IDs from nested objects and mark as sprint
                     foreach (var result in race.SprintResults)
                     {
-                        // Mark as sprint result
                         result.IsSprint = true;
-                        // Populate IDs from nested objects
                         result.DriverId = result.Driver?.DriverId ?? result.DriverId;
                         result.ConstructorId = result.Constructor?.ConstructorId ?? result.ConstructorId;
-                        await _resultRepository.AddOrUpdateAsync(result, race.Season, race.Round);
                     }
+                    
+                    // Batch save all sprint results for this race
+                    await _resultRepository.AddOrUpdateBatchAsync(race.SprintResults, race.Season, race.Round);
                 }
             }
 

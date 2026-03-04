@@ -57,6 +57,59 @@ public class QualifyingRepository
         }
     }
 
+    public async Task AddOrUpdateBatchAsync(IEnumerable<Qualifying> qualifyings, string season, string round)
+    {
+        var qualifyingList = qualifyings.ToList();
+        if (!qualifyingList.Any()) return;
+
+        try
+        {
+            var driverIds = qualifyingList.Select(q => q.DriverId).ToList();
+
+            // Single query to get all existing qualifyings for this season/round
+            var existingQualifyings = await _context.Qualifyings
+                .Where(q => q.Season == season && q.Round == round && driverIds.Contains(q.DriverId))
+                .ToDictionaryAsync(q => q.DriverId);
+
+            var updatedCount = 0;
+            var addedCount = 0;
+
+            foreach (var qualifying in qualifyingList)
+            {
+                if (existingQualifyings.TryGetValue(qualifying.DriverId, out var existing))
+                {
+                    // Update existing
+                    existing.Number = qualifying.Number;
+                    existing.Position = qualifying.Position;
+                    existing.ConstructorId = qualifying.ConstructorId;
+                    existing.Q1 = qualifying.Q1;
+                    existing.Q2 = qualifying.Q2;
+                    existing.Q3 = qualifying.Q3;
+                    _context.Qualifyings.Update(existing);
+                    updatedCount++;
+                }
+                else
+                {
+                    // Add new
+                    qualifying.Season = season;
+                    qualifying.Round = round;
+                    await _context.Qualifyings.AddAsync(qualifying);
+                    addedCount++;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            
+            _logger.LogInformation("Batch saved qualifying for season {Season}, round {Round}: {Added} added, {Updated} updated",
+                season, round, addedCount, updatedCount);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error batch saving qualifying for season {Season}, round {Round}", season, round);
+            throw;
+        }
+    }
+
     public async Task<IEnumerable<Qualifying>> GetBySeasonAsync(string season)
     {
         _logger.LogDebug("Fetching qualifying results for season {Season}", season);

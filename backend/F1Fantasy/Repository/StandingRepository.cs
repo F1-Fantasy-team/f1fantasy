@@ -51,10 +51,36 @@ public class StandingRepository
 
     public async Task UpsertManyAsync(List<Standing> standings)
     {
+        if (!standings.Any()) return;
+
+        var groupId = standings.First().GroupId;
+        var userIds = standings.Select(s => s.UserId).ToList();
+
+        // Single query to get all existing standings for these users in this group
+        var existingStandings = await _context.Standings
+            .Where(s => s.GroupId == groupId && userIds.Contains(s.UserId))
+            .ToDictionaryAsync(s => s.UserId);
+
         foreach (var standing in standings)
         {
-            await UpsertAsync(standing);
+            if (existingStandings.TryGetValue(standing.UserId, out var existing))
+            {
+                // Update existing
+                existing.TotalScore = standing.TotalScore;
+                existing.Rank = standing.Rank;
+                existing.CategoryScoresJson = standing.CategoryScoresJson;
+                existing.UpdatedAt = DateTime.UtcNow;
+                _context.Standings.Update(existing);
+            }
+            else
+            {
+                // Add new
+                standing.UpdatedAt = DateTime.UtcNow;
+                _context.Standings.Add(standing);
+            }
         }
+
+        await _context.SaveChangesAsync();
     }
 
     public async Task DeleteByGroupAsync(int groupId)
