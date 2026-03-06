@@ -50,11 +50,11 @@ public class MultiClerkConfigurationManager : IConfigurationManager<OpenIdConnec
                 return _cachedConfiguration;
             }
 
-            // Fetch configurations from all Clerk instances
+            // Fetch configurations from all Clerk instances in parallel
             var configurations = new List<OpenIdConnectConfiguration>();
             var issuers = new List<string>();
 
-            foreach (var metadataAddress in _metadataAddresses)
+            var fetchTasks = _metadataAddresses.Select(async metadataAddress =>
             {
                 try
                 {
@@ -72,6 +72,24 @@ public class MultiClerkConfigurationManager : IConfigurationManager<OpenIdConnec
 
                     var config = await configurationManager.GetConfigurationAsync(cancel);
 
+                    _logger.LogInformation("Successfully fetched configuration from: {MetadataAddress} with {KeyCount} signing keys and issuer: {Issuer}", 
+                        metadataAddress, config.SigningKeys.Count, config.Issuer);
+                    
+                    return (config, metadataAddress);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to fetch configuration from: {MetadataAddress}", metadataAddress);
+                    return (null, metadataAddress);
+                }
+            });
+
+            var results = await Task.WhenAll(fetchTasks);
+
+            foreach (var (config, metadataAddress) in results)
+            {
+                if (config != null)
+                {
                     configurations.Add(config);
                     
                     // Collect issuers from discovery documents and normalize (remove trailing slash)
@@ -83,14 +101,6 @@ public class MultiClerkConfigurationManager : IConfigurationManager<OpenIdConnec
                             issuers.Add(normalizedIssuer);
                         }
                     }
-
-                    _logger.LogInformation("Successfully fetched configuration from: {MetadataAddress} with {KeyCount} signing keys and issuer: {Issuer}", 
-                        metadataAddress, config.SigningKeys.Count, config.Issuer);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to fetch configuration from: {MetadataAddress}", metadataAddress);
-                    // Continue with other endpoints even if one fails
                 }
             }
 

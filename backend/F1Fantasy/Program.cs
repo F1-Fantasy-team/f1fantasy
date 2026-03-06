@@ -233,7 +233,7 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
         options.ConfigurationManager = configManager;
         options.RequireHttpsMetadata = true;
 
-        // Pre-fetch configuration to get valid issuers
+        // Get configuration and valid issuers (will use cached values from startup warmup)
         var configuration = configManager.GetConfigurationAsync(CancellationToken.None).GetAwaiter().GetResult();
         var validIssuers = configManager.GetValidIssuers();
 
@@ -403,6 +403,22 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// Warm up OIDC configuration cache at startup (don't make first user wait ~1.4s)
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+var configManager = app.Services.GetRequiredService<F1Fantasy.Services.MultiClerkConfigurationManager>();
+try
+{
+    logger.LogInformation("Warming up OIDC configuration cache at startup...");
+    var warmupTask = configManager.GetConfigurationAsync(CancellationToken.None);
+    warmupTask.Wait(TimeSpan.FromSeconds(10)); // Timeout to prevent hanging startup
+    logger.LogInformation("OIDC configuration cache warmed successfully");
+}
+catch (Exception ex)
+{
+    // Don't crash startup if OIDC fetch fails - it will retry on first request
+    logger.LogWarning(ex, "Failed to warm OIDC configuration cache at startup. Will retry on first authenticated request.");
+}
 
 // Add request context middleware first to attach correlation id and total request timing
 app.UseMiddleware<RequestContextLoggingMiddleware>();
