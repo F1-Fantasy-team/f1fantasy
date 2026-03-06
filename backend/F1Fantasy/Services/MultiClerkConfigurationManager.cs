@@ -75,19 +75,20 @@ public class MultiClerkConfigurationManager : IConfigurationManager<OpenIdConnec
                     _logger.LogInformation("Successfully fetched configuration from: {MetadataAddress} with {KeyCount} signing keys and issuer: {Issuer}", 
                         metadataAddress, config.SigningKeys.Count, config.Issuer);
                     
-                    return (config, metadataAddress);
+                    return ((OpenIdConnectConfiguration?)config, metadataAddress);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Failed to fetch configuration from: {MetadataAddress}", metadataAddress);
-                    return (null, metadataAddress);
+                    return ((OpenIdConnectConfiguration?)null, metadataAddress);
                 }
             });
 
             var results = await Task.WhenAll(fetchTasks);
 
-            foreach (var (config, metadataAddress) in results)
+            foreach (var result in results)
             {
+                var (config, metadataAddress) = result;
                 if (config != null)
                 {
                     configurations.Add(config);
