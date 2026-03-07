@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using F1Fantasy.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace F1Fantasy.Controllers;
 
@@ -9,10 +11,12 @@ namespace F1Fantasy.Controllers;
 public class HealthController : ControllerBase
 {
     private readonly ILogger<HealthController> _logger;
+    private readonly F1FantasyDbContext _dbContext;
 
-    public HealthController(ILogger<HealthController> logger)
+    public HealthController(ILogger<HealthController> logger, F1FantasyDbContext dbContext)
     {
         _logger = logger;
+        _dbContext = dbContext;
     }
 
     /// <summary>
@@ -38,5 +42,49 @@ public class HealthController : ControllerBase
     public IActionResult Ping()
     {
         return Ok("pong");
+    }
+
+    /// <summary>
+    /// Health check with database connectivity check - keeps DB connection pool warm
+    /// Use this for uptime monitoring services (Betterstack, UptimeRobot, etc.)
+    /// </summary>
+    [HttpGet("ready")]
+    [ResponseCache(Duration = 30)] // Cache for 30 seconds to avoid hammering DB
+    public async Task<IActionResult> GetReadiness()
+    {
+        try
+        {
+            // Execute a lightweight query to keep DB connection pool warm
+            var canConnect = await _dbContext.Database.CanConnectAsync();
+            
+            if (!canConnect)
+            {
+                _logger.LogWarning("Database connection failed during health check");
+                return StatusCode(503, new
+                {
+                    status = "unhealthy",
+                    database = "disconnected",
+                    timestamp = DateTime.UtcNow
+                });
+            }
+
+            return Ok(new
+            {
+                status = "ready",
+                database = "connected",
+                timestamp = DateTime.UtcNow,
+                service = "F1Fantasy API"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Health check failed: {Message}", ex.Message);
+            return StatusCode(503, new
+            {
+                status = "unhealthy",
+                error = "Database connectivity check failed",
+                timestamp = DateTime.UtcNow
+            });
+        }
     }
 }
