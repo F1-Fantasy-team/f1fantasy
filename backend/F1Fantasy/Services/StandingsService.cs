@@ -115,14 +115,15 @@ public class StandingsService
 
         var members = await _groupRepository.GetMembersAsync(groupId);
         
-        // Parallelize score calculation for all members
-        var scoreTasks = members.Select(async member =>
+        // Calculate scores sequentially to avoid DbContext concurrency issues
+        var standings = new List<(Standing Standing, DateTime? CompletionTime)>();
+        foreach (var member in members)
         {
             var categoryScores = await _scoringService.CalculateAllCategoryScoresAsync(groupId, member.UserId, season);
             var totalScore = categoryScores.Values.Sum();
             var completionTime = await GetUserPredictionCompletionTimeAsync(groupId, member.UserId);
             
-            return (Standing: new Standing
+            standings.Add((new Standing
             {
                 GroupId = groupId,
                 UserId = member.UserId,
@@ -130,10 +131,8 @@ public class StandingsService
                 CategoryScoresJson = JsonSerializer.Serialize(categoryScores),
                 Rank = 0, // Will be set after sorting
                 UpdatedAt = DateTime.UtcNow
-            }, CompletionTime: completionTime);
-        }).ToList();
-
-        var standings = await Task.WhenAll(scoreTasks);
+            }, completionTime));
+        }
 
         // Sort by total score descending, then by completion time ascending (earlier completion = better rank in case of tie)
         var rankedStandings = standings

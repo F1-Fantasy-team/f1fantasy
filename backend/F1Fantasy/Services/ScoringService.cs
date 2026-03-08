@@ -65,11 +65,16 @@ public class ScoringService
         if (standingsList?.ConstructorStandings == null || !standingsList.ConstructorStandings.Any())
             return 0;
 
+        // Build actual ranking with all constructors
+        // Those with numeric position come first, then those with positionText="-" are treated as position 22
         var actualRanking = standingsList.ConstructorStandings
-            .OrderBy(s => int.Parse(s.Position))
-            .Select(s => s.Constructor?.ConstructorId)
-            .Where(id => id != null)
-            .Cast<string>()
+            .Select(s => new {
+                ConstructorId = s.Constructor?.ConstructorId,
+                Position = int.TryParse(s.Position, out var pos) ? pos : 22
+            })
+            .Where(x => x.ConstructorId != null)
+            .OrderBy(x => x.Position)
+            .Select(x => x.ConstructorId!)
             .ToList();
 
         return CalculateChampionshipScore(prediction.RankedConstructorIds, actualRanking);
@@ -85,11 +90,16 @@ public class ScoringService
         if (standingsList?.DriverStandings == null || !standingsList.DriverStandings.Any())
             return 0;
 
+        // Build actual ranking with all drivers
+        // Those with numeric position come first, then those with positionText="-" are treated as position 22
         var actualRanking = standingsList.DriverStandings
-            .OrderBy(s => int.Parse(s.Position))
-            .Select(s => s.Driver?.DriverId)
-            .Where(id => id != null)
-            .Cast<string>()
+            .Select(s => new {
+                DriverId = s.Driver?.DriverId,
+                Position = int.TryParse(s.Position, out var pos) ? pos : 22
+            })
+            .Where(x => x.DriverId != null)
+            .OrderBy(x => x.Position)
+            .Select(x => x.DriverId!)
             .ToList();
 
         return CalculateChampionshipScore(prediction.RankedDriverIds, actualRanking);
@@ -250,40 +260,42 @@ public class ScoringService
 
     public async Task<Dictionary<string, int>> CalculateAllCategoryScoresAsync(int groupId, string userId, string season)
     {
-        // Parallelize all independent score calculations
-        var constructorChampTask = CalculateConstructorChampionshipScoreAsync(groupId, userId, season);
-        var driverChampTask = CalculateDriverChampionshipScoreAsync(groupId, userId, season);
-        var driverDraftTask = CalculateDriverDraftScoreAsync(groupId, userId, season);
-        var destructorTask = CalculateDestructorScoreAsync(groupId, userId, season);
-        var mrSaturdayTask = CalculateMrSaturdayScoreAsync(groupId, userId, season);
-        var zeroPointerTask = CalculateZeroPointerScoreAsync(groupId, userId, season);
-        var wildcardTask = CalculateWildcardScoreAsync(groupId, userId);
-
-        await Task.WhenAll(constructorChampTask, driverChampTask, driverDraftTask, destructorTask, 
-            mrSaturdayTask, zeroPointerTask, wildcardTask);
+        // Calculate scores sequentially to avoid DbContext concurrency issues
+        // The async/await pattern already provides adequate concurrency at the database level
+        var constructorChamp = await CalculateConstructorChampionshipScoreAsync(groupId, userId, season);
+        var driverChamp = await CalculateDriverChampionshipScoreAsync(groupId, userId, season);
+        var driverDraft = await CalculateDriverDraftScoreAsync(groupId, userId, season);
+        var destructor = await CalculateDestructorScoreAsync(groupId, userId, season);
+        var mrSaturday = await CalculateMrSaturdayScoreAsync(groupId, userId, season);
+        var zeroPointer = await CalculateZeroPointerScoreAsync(groupId, userId, season);
+        var wildcard = await CalculateWildcardScoreAsync(groupId, userId);
 
         return new Dictionary<string, int>
         {
-            ["constructorChampionship"] = await constructorChampTask,
-            ["driverChampionship"] = await driverChampTask,
-            ["driverDraft"] = await driverDraftTask,
-            ["destructor"] = await destructorTask,
-            ["mrSaturday"] = await mrSaturdayTask,
-            ["zeroPointer"] = await zeroPointerTask,
-            ["wildcard"] = await wildcardTask
+            ["constructorChampionship"] = constructorChamp,
+            ["driverChampionship"] = driverChamp,
+            ["driverDraft"] = driverDraft,
+            ["destructor"] = destructor,
+            ["mrSaturday"] = mrSaturday,
+            ["zeroPointer"] = zeroPointer,
+            ["wildcard"] = wildcard
         };
     }
 
     private int CalculateChampionshipScore(List<string> predicted, List<string> actual)
     {
         int score = 0;
+        const int BASELINE_POINTS = 20;
 
-        for (int i = 0; i < Math.Min(predicted.Count, actual.Count); i++)
+        for (int i = 0; i < predicted.Count; i++)
         {
-            if (predicted[i] == actual[i])
+            // Each prediction starts with 20 points baseline
+            int predictionScore = BASELINE_POINTS;
+
+            if (i < actual.Count && predicted[i] == actual[i])
             {
-                // Exact match
-                score += CHAMPIONSHIP_EXACT_MATCH_POINTS;
+                // Exact match: baseline + bonus
+                predictionScore += CHAMPIONSHIP_EXACT_MATCH_POINTS;
             }
             else
             {
@@ -291,11 +303,19 @@ public class ScoringService
                 int actualPosition = actual.IndexOf(predicted[i]);
                 if (actualPosition != -1)
                 {
-                    // Calculate position delta
+                    // Calculate position delta and deduct penalty
                     int delta = Math.Abs(i - actualPosition);
-                    score += delta * CHAMPIONSHIP_POSITION_PENALTY;
+                    predictionScore += delta * CHAMPIONSHIP_POSITION_PENALTY; // Negative penalty
+                }
+                else
+                {
+                    // Driver/constructor not in the actual standings - assume worst position (22)
+                    int delta = Math.Abs(i - 21); // 21 because index is 0-based, position 22
+                    predictionScore += delta * CHAMPIONSHIP_POSITION_PENALTY;
                 }
             }
+
+            score += predictionScore;
         }
 
         return score;

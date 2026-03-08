@@ -71,7 +71,11 @@ public class ConstructorStandingRepository
             .ToListAsync();
 
         // Sort in memory since int.Parse can't be translated to SQL
-        return standings.OrderBy(cs => int.Parse(cs.Position)).ToList();
+        // Filter out any standings with empty Position before parsing
+        return standings
+            .Where(cs => !string.IsNullOrEmpty(cs.Position))
+            .OrderBy(cs => int.Parse(cs.Position))
+            .ToList();
     }
 
     public async Task<ConstructorStanding?> GetByConstructorAsync(string season, string round, string constructorId)

@@ -62,7 +62,10 @@ public class DriverStandingRepository
             .Where(s => s.Season == season && s.Round == round)
             .ToListAsync();
         
-        return standings.OrderBy(s => int.Parse(s.Position));
+        // Filter out any standings with empty Position before parsing
+        return standings
+            .Where(s => !string.IsNullOrEmpty(s.Position))
+            .OrderBy(s => int.Parse(s.Position));
     }
 
     public async Task<IEnumerable<DriverStanding>> GetBySeasonAsync(string season)
@@ -105,7 +108,9 @@ public class DriverStandingRepository
         _logger.LogDebug("Fetching all driver standings");
         var standings = await _context.DriverStandings.AsNoTracking().ToListAsync();
         
+        // Filter out any standings with empty Position or Round before parsing
         return standings
+            .Where(s => !string.IsNullOrEmpty(s.Round) && !string.IsNullOrEmpty(s.Position))
             .OrderBy(s => s.Season)
             .ThenBy(s => int.Parse(s.Round))
             .ThenBy(s => int.Parse(s.Position));
