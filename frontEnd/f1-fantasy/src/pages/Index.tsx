@@ -14,8 +14,6 @@ import { fetchRacesForSeasonFromApi, getFirstRaceDateFromRaces } from "../api/ra
 import {
   createGroupFromApi,
   fetchMyGroupsFromApi,
-  fetchGroupDetailFromApi,
-  mapGroupDetailApiToUserPredictions,
   fetchGroupByInviteCodeFromApi,
   joinGroupFromApi,
   leaveGroupFromApi,
@@ -34,10 +32,10 @@ import {
   postWildcardFromApi,
 } from "../api/predictions";
 import type { PredictionCategoryId } from "../types/predictions";
-import { createInitialGroupPredictionsData } from "../utils/groupPredictionsData";
 import type { Group } from "../types/group";
 import type { PredictionLockMode } from "../types/group";
-import type { MemberStanding, UserPredictions } from "../types/predictions";
+import type { MemberStanding } from "../types/predictions";
+import { createInitialGroupPredictionsData } from "../utils/groupPredictionsData";
 
 /** Merge API standings with group members so every member appears. Use group.members as fallback when API returns []. */
 function mergeStandingsWithGroupMembers(
@@ -228,6 +226,8 @@ export default function Index() {
     let intervalId: number | undefined;
 
     const fetchStandings = () => {
+      const group = selectedGroupRef.current;
+      if (!group) return;
       fetchGroupStandingsOnlyFromApi(
         selectedGroupId,
         currentUserId,
@@ -236,7 +236,7 @@ export default function Index() {
         if (cancelled || result == null) return;
         const standingsWithAllMembers = mergeStandingsWithGroupMembers(
           result.standings,
-          selectedGroup,
+          group,
           currentUserId,
           currentUserDisplayName
         );
@@ -250,7 +250,7 @@ export default function Index() {
           predictions: (prev?.predictions ?? []).filter(
             (p) => p.userId !== currentUserId
           ).concat(result.predictions),
-          predictionLock: selectedGroup.predictionsLocked,
+          predictionLock: group.predictionsLocked,
         }));
       });
     };
@@ -269,12 +269,8 @@ export default function Index() {
   }, [
     isSignedIn,
     selectedGroupId,
-    selectedGroup?.id,
-    selectedGroup?.predictionsLocked,
     currentUserId,
     currentUserDisplayName,
-    setUserGroups,
-    setAllGroups,
     setGroupData,
   ]);
 
