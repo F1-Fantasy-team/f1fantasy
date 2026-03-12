@@ -115,6 +115,7 @@ export default function Index() {
   const [createGroupModalOpen, setCreateGroupModalOpen] = useState(false);
   const [joinGroupModalOpen, setJoinGroupModalOpen] = useState(false);
   const [joinInitialCode, setJoinInitialCode] = useState<string | undefined>();
+  const [standingsLoading, setStandingsLoading] = useState(false);
 
   const mergedDefault = useMemo(() => {
     if (!selectedGroup) return null;
@@ -228,6 +229,7 @@ export default function Index() {
     const fetchStandings = () => {
       const group = selectedGroupRef.current;
       if (!group) return;
+      setStandingsLoading(true);
       fetchGroupStandingsOnlyFromApi(
         selectedGroupId,
         currentUserId,
@@ -252,6 +254,10 @@ export default function Index() {
           ).concat(result.predictions),
           predictionLock: group.predictionsLocked,
         }));
+      }).finally(() => {
+        if (!cancelled) {
+          setStandingsLoading(false);
+        }
       });
     };
 
@@ -452,6 +458,7 @@ export default function Index() {
             setData={(newData) => setGroupData(typeof newData === 'function' ? (prev) => newData(prev ?? data) : newData)}
             currentUserId={currentUserId}
             currentUserDisplayName={currentUserDisplayName}
+            standingsLoading={standingsLoading}
             onDeleteGroup={handleDeleteGroup}
             onLeaveGroup={handleLeaveGroup}
             onRenameGroup={handleRenameGroup}

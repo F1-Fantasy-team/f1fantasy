@@ -24,6 +24,7 @@ type GroupPredictionsViewProps = {
   setData: (data: GroupPredictionsData | ((prev: GroupPredictionsData) => GroupPredictionsData)) => void;
   currentUserId: string;
   currentUserDisplayName: string;
+  standingsLoading?: boolean;
   onDeleteGroup?: (groupId: string) => void;
   onLeaveGroup?: (groupId: string) => void;
   onRenameGroup?: (groupId: string, newName: string) => void;
@@ -35,6 +36,7 @@ export function GroupPredictionsView({
   setData,
   currentUserId,
   currentUserDisplayName: _currentUserDisplayName,
+  standingsLoading,
   onDeleteGroup,
   onLeaveGroup,
   onRenameGroup,
@@ -237,7 +239,7 @@ export function GroupPredictionsView({
         <F1Title level={5} className="!mb-2">
           Standings
         </F1Title>
-        <StandingsTable standings={data.standings} currentUserId={currentUserId} />
+        <StandingsTable standings={data.standings} currentUserId={currentUserId} isLoading={standingsLoading} />
       </section>
 
       <section>
