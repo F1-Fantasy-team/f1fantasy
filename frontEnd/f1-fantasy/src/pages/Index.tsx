@@ -14,6 +14,9 @@ import { fetchRacesForSeasonFromApi, getFirstRaceDateFromRaces } from "../api/ra
 import {
   createGroupFromApi,
   fetchMyGroupsFromApi,
+  fetchGroupFromApi,
+  fetchGroupDetailFromApi,
+  mapGroupDetailApiToUserPredictions,
   fetchGroupByInviteCodeFromApi,
   joinGroupFromApi,
   leaveGroupFromApi,
@@ -34,7 +37,7 @@ import {
 import type { PredictionCategoryId } from "../types/predictions";
 import type { Group } from "../types/group";
 import type { PredictionLockMode } from "../types/group";
-import type { MemberStanding } from "../types/predictions";
+import type { MemberStanding, UserPredictions } from "../types/predictions";
 import { createInitialGroupPredictionsData } from "../utils/groupPredictionsData";
 
 /** Merge API standings with group members so every member appears. Use group.members as fallback when API returns []. */
@@ -426,6 +429,61 @@ export default function Index() {
       message.error(err instanceof Error ? err.message : "Failed to rename group");
     }
   };
+
+  // When a group is selected, hydrate it with full details (including member displayNames and predictions)
+  // using GET /api/groups/{id}. This was how we originally loaded richer group data.
+  useEffect(() => {
+    if (!isSignedIn || !selectedGroupId || !getApiBaseUrl()) return;
+
+    let cancelled = false;
+    // Fetch group shell (members with displayName etc.)
+    fetchGroupFromApi(selectedGroupId).then((group) => {
+      if (cancelled || !group) return;
+      setUserGroups((prev) =>
+        prev.map((g) => (g.id === group.id ? group : g))
+      );
+      setAllGroups((prev) =>
+        prev.map((g) => (g.id === group.id ? group : g))
+      );
+    });
+
+    // Fetch full group detail including all members' predictions
+    fetchGroupDetailFromApi(selectedGroupId).then((detail) => {
+      if (cancelled || !detail) return;
+      const memberPredictions = mapGroupDetailApiToUserPredictions(detail);
+      if (!memberPredictions.length) return;
+
+      setGroupData((prev) => {
+        const base: { groupId: string; standings: MemberStanding[]; predictions: UserPredictions[]; lockedUserIds?: string[] } =
+          prev ?? {
+            groupId: selectedGroupId,
+            standings: [],
+            predictions: [],
+          };
+
+        const existingByUserId = new Map(
+          (base.predictions ?? []).map((p) => [p.userId, p] as const)
+        );
+
+        for (const mp of memberPredictions) {
+          const existing = existingByUserId.get(mp.userId);
+          existingByUserId.set(mp.userId, {
+            ...(existing ?? { userId: mp.userId, displayName: mp.displayName }),
+            ...mp,
+          });
+        }
+
+        return {
+          ...base,
+          predictions: Array.from(existingByUserId.values()),
+        };
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isSignedIn, selectedGroupId, setUserGroups, setAllGroups]);
 
   if (!isLoaded) {
     return <LoadingScreen />;
