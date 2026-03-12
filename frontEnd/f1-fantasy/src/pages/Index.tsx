@@ -116,6 +116,7 @@ export default function Index() {
   const [joinGroupModalOpen, setJoinGroupModalOpen] = useState(false);
   const [joinInitialCode, setJoinInitialCode] = useState<string | undefined>();
   const [standingsLoading, setStandingsLoading] = useState(false);
+  const [standingsLoadedOnce, setStandingsLoadedOnce] = useState(false);
 
   const mergedDefault = useMemo(() => {
     if (!selectedGroup) return null;
@@ -229,7 +230,9 @@ export default function Index() {
     const fetchStandings = () => {
       const group = selectedGroupRef.current;
       if (!group) return;
-      setStandingsLoading(true);
+      if (!standingsLoadedOnce) {
+        setStandingsLoading(true);
+      }
       fetchGroupStandingsOnlyFromApi(
         selectedGroupId,
         currentUserId,
@@ -256,7 +259,10 @@ export default function Index() {
         }));
       }).finally(() => {
         if (!cancelled) {
-          setStandingsLoading(false);
+          if (!standingsLoadedOnce) {
+            setStandingsLoading(false);
+            setStandingsLoadedOnce(true);
+          }
         }
       });
     };
@@ -278,6 +284,7 @@ export default function Index() {
     currentUserId,
     currentUserDisplayName,
     setGroupData,
+    standingsLoadedOnce,
   ]);
 
   // When user opens a category, fetch that category's prediction (one GET; 404 only if that category is empty).
