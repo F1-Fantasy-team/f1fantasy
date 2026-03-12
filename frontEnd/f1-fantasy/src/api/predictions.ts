@@ -15,8 +15,18 @@ import type {
 
 import { getCurrentSeason } from "../constants/season";
 
-/** Backend category key in categoryScoresJson */
+/** Backend category key in categoryScoresJson (supports both legacy PascalCase and current camelCase keys) */
 const BACKEND_CATEGORY_TO_FRONT: Record<string, PredictionCategoryId> = {
+  // Current JSON keys (example: {"constructorChampionship":200,...})
+  driverChampionship: "driversChampionship",
+  constructorChampionship: "constructorsChampionship",
+  driverDraft: "driverDraft",
+  destructor: "destructors",
+  mrSaturday: "mrSaturday",
+  zeroPointer: "zeroPointers",
+  wildcard: "wildcard",
+
+  // Legacy / fallback PascalCase keys, if any rows still use them
   DriverChampionship: "driversChampionship",
   ConstructorChampionship: "constructorsChampionship",
   DriverDraft: "driverDraft",

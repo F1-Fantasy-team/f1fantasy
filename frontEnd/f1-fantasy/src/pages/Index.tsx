@@ -52,14 +52,20 @@ function mergeStandingsWithGroupMembers(
 
   const merged: MemberStanding[] = members.map(({ userId, displayName }) => {
     const existing = byUserId.get(userId);
-    if (existing) return existing;
-
     const effectiveDisplayName =
       userId === currentUserId
         ? currentUserDisplayName
         : displayName && displayName.trim().length > 0
         ? displayName
         : userId;
+
+    if (existing) {
+      // Keep scores/rank from API but always enrich displayName from group members/Clerk.
+      return {
+        ...existing,
+        displayName: effectiveDisplayName,
+      };
+    }
 
     return {
       userId,
@@ -203,7 +209,7 @@ export default function Index() {
     if (mergedDefault != null && groupData == null) setGroupData(mergedDefault);
   }, [mergedDefault, groupData, setGroupData]);
 
-  // When API is set, fetch only standings for the group (no prediction category GETs → no 404s for new groups).
+  // When API is set, fetch standings for the group and keep them refreshed periodically
   useEffect(() => {
     if (
       !selectedGroupId ||
@@ -213,33 +219,46 @@ export default function Index() {
     )
       return;
     let cancelled = false;
-    fetchGroupStandingsOnlyFromApi(
-      selectedGroupId,
-      currentUserId,
-      currentUserDisplayName
-    ).then((result) => {
-      if (cancelled || result == null) return;
-      const standingsWithAllMembers = mergeStandingsWithGroupMembers(
-        result.standings,
-        selectedGroup,
+    let intervalId: number | undefined;
+
+    const fetchStandings = () => {
+      fetchGroupStandingsOnlyFromApi(
+        selectedGroupId,
         currentUserId,
         currentUserDisplayName
-      );
-      setGroupData((prev) => ({
-        ...(prev ?? {
-          groupId: selectedGroupId,
-          standings: [],
-          predictions: [],
-        }),
-        standings: standingsWithAllMembers,
-        predictions: (prev?.predictions ?? []).filter(
-          (p) => p.userId !== currentUserId
-        ).concat(result.predictions),
-        predictionLock: selectedGroup.predictionsLocked,
-      }));
-    });
+      ).then((result) => {
+        if (cancelled || result == null) return;
+        const standingsWithAllMembers = mergeStandingsWithGroupMembers(
+          result.standings,
+          selectedGroup,
+          currentUserId,
+          currentUserDisplayName
+        );
+        setGroupData((prev) => ({
+          ...(prev ?? {
+            groupId: selectedGroupId,
+            standings: [],
+            predictions: [],
+          }),
+          standings: standingsWithAllMembers,
+          predictions: (prev?.predictions ?? []).filter(
+            (p) => p.userId !== currentUserId
+          ).concat(result.predictions),
+          predictionLock: selectedGroup.predictionsLocked,
+        }));
+      });
+    };
+
+    // Initial fetch
+    fetchStandings();
+    // Then poll periodically for updated standings while this group is open
+    intervalId = window.setInterval(fetchStandings, 30000);
+
     return () => {
       cancelled = true;
+      if (intervalId !== undefined) {
+        window.clearInterval(intervalId);
+      }
     };
   }, [
     isSignedIn,
