@@ -1,12 +1,13 @@
-import { Table } from "antd";
+import { Table, Spin } from "antd";
 import type { MemberStanding } from "../types/predictions";
 
 type StandingsTableProps = {
   standings: MemberStanding[];
   currentUserId: string;
+  isLoading?: boolean;
 };
 
-export function StandingsTable({ standings, currentUserId }: StandingsTableProps) {
+export function StandingsTable({ standings, currentUserId, isLoading }: StandingsTableProps) {
   const columns = [
     {
       title: "Rank",
@@ -22,7 +23,10 @@ export function StandingsTable({ standings, currentUserId }: StandingsTableProps
       dataIndex: "displayName",
       key: "displayName",
       render: (name: string, record: MemberStanding) => {
-        const effectiveName = (name && name.trim().length > 0) ? name : record.userId;
+        const raw = name && name.trim().length > 0 ? name.trim() : record.userId;
+        const looksLikeUserId = raw.startsWith("user_");
+        const baseName = looksLikeUserId ? (record.rank ? `Member ${record.rank}` : "Member") : raw;
+        const effectiveName = record.userId === currentUserId ? (looksLikeUserId ? "You" : baseName) : baseName;
         return (
           <span className={record.userId === currentUserId ? "text-f1-red font-medium" : "text-f1-silver"}>
             {record.userId === currentUserId ? `${effectiveName} (you)` : effectiveName}
@@ -42,7 +46,12 @@ export function StandingsTable({ standings, currentUserId }: StandingsTableProps
   ];
 
   return (
-    <div className="min-w-0 overflow-x-auto [-webkit-overflow-scrolling:touch]">
+    <div className="relative min-w-0 overflow-x-auto [-webkit-overflow-scrolling:touch]">
+      {isLoading && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-f1-carbon/70 backdrop-blur-sm">
+          <Spin />
+        </div>
+      )}
       <Table
         dataSource={standings}
         columns={columns}
