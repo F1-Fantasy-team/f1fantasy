@@ -54,14 +54,20 @@ function mergeStandingsWithGroupMembers(
 
   const merged: MemberStanding[] = members.map(({ userId, displayName }) => {
     const existing = byUserId.get(userId);
-    if (existing) return existing;
-
     const effectiveDisplayName =
       userId === currentUserId
         ? currentUserDisplayName
         : displayName && displayName.trim().length > 0
         ? displayName
         : userId;
+
+    if (existing) {
+      // Keep scores/rank from API but always enrich displayName from group members/Clerk.
+      return {
+        ...existing,
+        displayName: effectiveDisplayName,
+      };
+    }
 
     return {
       userId,
@@ -209,7 +215,7 @@ export default function Index() {
     if (mergedDefault != null && groupData == null) setGroupData(mergedDefault);
   }, [mergedDefault, groupData, setGroupData]);
 
-  // When API is set, fetch detailed group data + standings when a group is opened.
+  // When API is set, fetch standings for the group and keep them refreshed periodically
   useEffect(() => {
     if (
       !selectedGroupId ||
@@ -219,84 +225,46 @@ export default function Index() {
     )
       return;
     let cancelled = false;
-    Promise.all([
-      fetchGroupDetailFromApi(selectedGroupId),
+    let intervalId: number | undefined;
+
+    const fetchStandings = () => {
       fetchGroupStandingsOnlyFromApi(
         selectedGroupId,
         currentUserId,
         currentUserDisplayName
-      ),
-    ]).then(([groupDetail, result]) => {
-      if (cancelled || result == null) return;
-
-      const detailedGroup: Group | null = groupDetail
-        ? {
-            id: String(groupDetail.id),
-            name: groupDetail.name,
-            memberCount: Array.isArray(groupDetail.members) ? groupDetail.members.length : 0,
-            createdAt: groupDetail.createdAt,
-            inviteCode: groupDetail.inviteCode || undefined,
-            adminUserId: groupDetail.adminUserId || undefined,
-            predictionLockMode: groupDetail.lockMode,
-            predictionsLocked: groupDetail.predictionsLocked,
-            members: groupDetail.members?.map((m) => ({
-              userId: m.userId,
-              displayName: m.displayName,
-            })),
-          }
-        : null;
-
-      const effectiveGroup = detailedGroup ?? selectedGroupRef.current!;
-
-      if (detailedGroup) {
-        setUserGroups((prev) =>
-          prev.map((group) => (group.id === detailedGroup.id ? detailedGroup : group))
+      ).then((result) => {
+        if (cancelled || result == null) return;
+        const standingsWithAllMembers = mergeStandingsWithGroupMembers(
+          result.standings,
+          selectedGroup,
+          currentUserId,
+          currentUserDisplayName
         );
-        setAllGroups((prev) =>
-          prev.map((group) => (group.id === detailedGroup.id ? detailedGroup : group))
-        );
-      }
+        setGroupData((prev) => ({
+          ...(prev ?? {
+            groupId: selectedGroupId,
+            standings: [],
+            predictions: [],
+          }),
+          standings: standingsWithAllMembers,
+          predictions: (prev?.predictions ?? []).filter(
+            (p) => p.userId !== currentUserId
+          ).concat(result.predictions),
+          predictionLock: selectedGroup.predictionsLocked,
+        }));
+      });
+    };
 
-      const standingsWithAllMembers = mergeStandingsWithGroupMembers(
-        result.standings,
-        effectiveGroup,
-        currentUserId,
-        currentUserDisplayName
-      );
+    // Initial fetch
+    fetchStandings();
+    // Then poll periodically for updated standings while this group is open
+    intervalId = window.setInterval(fetchStandings, 30000);
 
-      const detailedPredictions = groupDetail
-        ? mapGroupDetailApiToUserPredictions(groupDetail)
-        : [];
-
-      setGroupData((prev) => ({
-        ...(prev ?? {
-          groupId: selectedGroupId,
-          standings: [],
-          predictions: [],
-        }),
-        standings: standingsWithAllMembers,
-        predictions: (() => {
-          const byUserId = new Map<string, UserPredictions>();
-
-          for (const prediction of prev?.predictions ?? []) {
-            byUserId.set(prediction.userId, prediction);
-          }
-
-          for (const prediction of detailedPredictions) {
-            byUserId.set(prediction.userId, prediction);
-          }
-
-          if (!byUserId.has(currentUserId)) {
-            byUserId.set(currentUserId, result.predictions);
-          }
-
-          return Array.from(byUserId.values());
-        })(),
-        predictionLock: effectiveGroup.predictionsLocked,
-      }));
-    });
     return () => {
       cancelled = true;
+      if (intervalId !== undefined) {
+        window.clearInterval(intervalId);
+      }
     };
   }, [
     isSignedIn,

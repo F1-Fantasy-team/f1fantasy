@@ -16,7 +16,8 @@ export function getConstructorName(id: string, constructors: Constructor[]) {
 }
 
 function getCategoryScore(standing: { categoryScores: { categoryId: string; score: number }[] }, categoryId: string) {
-  return standing.categoryScores.find((c) => c.categoryId === categoryId)?.score;
+  const entry = standing.categoryScores.find((c) => c.categoryId === categoryId);
+  return entry ? entry.score : 0;
 }
 
 type PredictionContentProps = {
