@@ -17,12 +17,14 @@ public class GroupsController : ControllerBase
 {
     private readonly GroupService _groupService;
     private readonly ClerkService _clerkService;
+    private readonly PredictionService _predictionService;
     private readonly ILogger<GroupsController> _logger;
 
-    public GroupsController(GroupService groupService, ClerkService clerkService, ILogger<GroupsController> logger)
+    public GroupsController(GroupService groupService, ClerkService clerkService, PredictionService predictionService, ILogger<GroupsController> logger)
     {
         _groupService = groupService;
         _clerkService = clerkService;
+        _predictionService = predictionService;
         _logger = logger;
     }
 
@@ -60,12 +62,9 @@ public class GroupsController : ControllerBase
             var groups = await _groupService.GetUserGroupsAsync(userId);
             _logger.LogInformation("[GetMyGroups] After GetUserGroupsAsync - GroupCount: {Count} - Elapsed: {Elapsed}ms", groups.Count, stopwatch.ElapsedMilliseconds);
             
-            var groupDtos = await EnrichGroupsWithMemberNamesAsync(groups);
-            _logger.LogInformation("[GetMyGroups] After EnrichGroupsWithMemberNamesAsync - Elapsed: {Elapsed}ms", stopwatch.ElapsedMilliseconds);
-            
             stopwatch.Stop();
             _logger.LogInformation("[GetMyGroups] Complete - Total: {Total}ms", stopwatch.ElapsedMilliseconds);
-            return Ok(groupDtos);
+            return Ok(groups);
         }
         catch (Exception ex)
         {
@@ -82,7 +81,7 @@ public class GroupsController : ControllerBase
         {
             var group = await _groupService.GetGroupByIdAsync(id);
             if (group == null) return NotFound();
-            var groupDto = await EnrichGroupWithMemberNamesAsync(group);
+            var groupDto = await EnrichGroupWithMemberNamesAndPredictionsAsync(group);
             return Ok(groupDto);
         }
         catch (Exception ex)
@@ -98,7 +97,7 @@ public class GroupsController : ControllerBase
         {
             var group = await _groupService.GetGroupByInviteCodeAsync(inviteCode);
             if (group == null) return NotFound();
-            var groupDto = await EnrichGroupWithMemberNamesAsync(group);
+            var groupDto = await EnrichGroupWithMemberNamesAndPredictionsAsync(group);
             return Ok(groupDto);
         }
         catch (Exception ex)
@@ -285,6 +284,68 @@ public class GroupsController : ControllerBase
                 IsAdmin = m.UserId == group.AdminUserId,
                 JoinedAt = m.JoinedAt
             }).ToList()
+        };
+    }
+
+    private async Task<GroupDto> EnrichGroupWithMemberNamesAndPredictionsAsync(Group group)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        _logger.LogInformation("[EnrichGroupWithMemberNamesAndPredictionsAsync] Start - GroupId: {GroupId}, MemberCount: {Count}", 
+            group.Id, group.Members.Count);
+        
+        var userIds = group.Members.Select(m => m.UserId).ToList();
+        
+        // Fetch display names
+        var displayNamesTask = _clerkService.GetUserDisplayNamesAsync(userIds);
+        
+        // Fetch ALL predictions for the group in one bulk operation (7 parallel queries)
+        var predictionsTask = _predictionService.GetAllPredictionsForGroupAsync(group.Id);
+        
+        await Task.WhenAll(displayNamesTask, predictionsTask);
+        
+        var displayNames = await displayNamesTask;
+        var allPredictions = await predictionsTask;
+        
+        _logger.LogInformation("[EnrichGroupWithMemberNamesAndPredictionsAsync] After bulk fetch - Elapsed: {Elapsed}ms", 
+            stopwatch.ElapsedMilliseconds);
+
+        var members = group.Members.Select(member =>
+        {
+            var userPredictions = allPredictions.GetValueOrDefault(member.UserId);
+            
+            return new GroupMemberDto
+            {
+                Id = member.Id,
+                GroupId = member.GroupId,
+                UserId = member.UserId,
+                DisplayName = displayNames.GetValueOrDefault(member.UserId, member.UserId),
+                IsAdmin = member.UserId == group.AdminUserId,
+                JoinedAt = member.JoinedAt,
+                DriverChampionship = userPredictions?.DriverChampionship,
+                ConstructorChampionship = userPredictions?.ConstructorChampionship,
+                DriverDraft = userPredictions?.DriverDraft,
+                Destructor = userPredictions?.Destructor,
+                MrSaturday = userPredictions?.MrSaturday,
+                ZeroPointer = userPredictions?.ZeroPointer,
+                Wildcard = userPredictions?.Wildcard
+            };
+        }).ToList();
+
+        stopwatch.Stop();
+        _logger.LogInformation("[EnrichGroupWithMemberNamesAndPredictionsAsync] Complete - Total: {Elapsed}ms", 
+            stopwatch.ElapsedMilliseconds);
+
+        return new GroupDto
+        {
+            Id = group.Id,
+            Name = group.Name,
+            InviteCode = group.InviteCode,
+            LockMode = group.LockMode,
+            AdminUserId = group.AdminUserId,
+            CreatedAt = group.CreatedAt,
+            PredictionsLocked = group.PredictionsLocked,
+            LockedAt = group.LockedAt,
+            Members = members
         };
     }
 

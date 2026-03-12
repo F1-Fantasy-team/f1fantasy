@@ -114,16 +114,15 @@ public class StandingsService
         await _scoringService.EnsureSeasonDataAvailableAsync(season);
 
         var members = await _groupRepository.GetMembersAsync(groupId);
-        var standings = new List<(Standing Standing, DateTime CompletionTime)>();
-
+        
+        // Calculate scores sequentially to avoid DbContext concurrency issues
+        var standings = new List<(Standing Standing, DateTime? CompletionTime)>();
         foreach (var member in members)
         {
             var categoryScores = await _scoringService.CalculateAllCategoryScoresAsync(groupId, member.UserId, season);
             var totalScore = categoryScores.Values.Sum();
-
-            // Get the latest prediction timestamp (when user finished all predictions)
             var completionTime = await GetUserPredictionCompletionTimeAsync(groupId, member.UserId);
-
+            
             standings.Add((new Standing
             {
                 GroupId = groupId,
@@ -211,18 +210,22 @@ public class StandingsService
         if (group == null) throw new KeyNotFoundException("Group not found");
 
         var members = await _groupRepository.GetMembersAsync(groupId);
-        var detailedStandings = new List<DetailedStanding>();
-
-        foreach (var member in members)
+        
+        // Parallelize detailed score calculation for all members
+        var detailedTasks = members.Select(async member =>
         {
             var detailed = await _scoringService.CalculateDetailedScoresAsync(groupId, member.UserId, season);
-            detailedStandings.Add(detailed);
-        }
+            var completionTime = await GetUserPredictionCompletionTimeAsync(groupId, member.UserId);
+            return (Detailed: detailed, CompletionTime: completionTime);
+        }).ToList();
+
+        var results = await Task.WhenAll(detailedTasks);
 
         // Sort by total score descending, then by earliest completion time
-        var rankedStandings = detailedStandings
-            .OrderByDescending(s => s.TotalScore)
-            .ThenBy(async s => await GetUserPredictionCompletionTimeAsync(groupId, s.UserId))
+        var rankedStandings = results
+            .OrderByDescending(r => r.Detailed.TotalScore)
+            .ThenBy(r => r.CompletionTime)
+            .Select(r => r.Detailed)
             .ToList();
 
         // Assign ranks

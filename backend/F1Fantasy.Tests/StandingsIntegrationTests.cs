@@ -29,6 +29,7 @@ public class StandingsIntegrationTests : IDisposable
     private readonly RaceRepository _raceRepository;
     private readonly HttpClient _httpClient;
     private readonly ResultService _resultService;
+    private readonly RaceService _raceService;
     private readonly QualifyingService _qualifyingService;
     private readonly DriverStandingService _driverStandingService;
     private readonly ConstructorStandingService _constructorStandingService;
@@ -58,22 +59,28 @@ public class StandingsIntegrationTests : IDisposable
         var options = new DbContextOptionsBuilder<F1FantasyDbContext>()
             .UseNpgsql(connectionString)
             .Options;
-        _context = new F1FantasyDbContext(options);
         
-        // Initialize repositories
-        _groupRepository = new GroupRepository(_context);
-        _predictionRepository = new PredictionRepository(_context);
-        _standingRepository = new StandingRepository(_context);
-        _resultRepository = new ResultRepository(_context, NullLogger<ResultRepository>.Instance);
-        _qualifyingRepository = new QualifyingRepository(_context, NullLogger<QualifyingRepository>.Instance);
-        _driverStandingRepository = new DriverStandingRepository(_context, NullLogger<DriverStandingRepository>.Instance);
-        _constructorStandingRepository = new ConstructorStandingRepository(_context, NullLogger<ConstructorStandingRepository>.Instance);
-        _metadataRepository = new DataFetchMetadataRepository(_context, NullLogger<DataFetchMetadataRepository>.Instance);
-        _raceRepository = new RaceRepository(_context, NullLogger<RaceRepository>.Instance);
+        // Create DbContextFactory for all repositories to avoid concurrency issues with parallel operations
+        var contextFactory = new TestDbContextFactory(options);
+        
+        // Keep a single context reference for cleanup
+        _context = contextFactory.CreateDbContext();
+        
+        // Initialize repositories - each gets its own context instance to support parallel operations
+        _groupRepository = new GroupRepository(contextFactory.CreateDbContext(), NullLogger<GroupRepository>.Instance);
+        _predictionRepository = new PredictionRepository(contextFactory);
+        _standingRepository = new StandingRepository(contextFactory.CreateDbContext());
+        _resultRepository = new ResultRepository(contextFactory.CreateDbContext(), NullLogger<ResultRepository>.Instance);
+        _qualifyingRepository = new QualifyingRepository(contextFactory.CreateDbContext(), NullLogger<QualifyingRepository>.Instance);
+        _driverStandingRepository = new DriverStandingRepository(contextFactory.CreateDbContext(), NullLogger<DriverStandingRepository>.Instance);
+        _constructorStandingRepository = new ConstructorStandingRepository(contextFactory.CreateDbContext(), NullLogger<ConstructorStandingRepository>.Instance);
+        _metadataRepository = new DataFetchMetadataRepository(contextFactory.CreateDbContext(), NullLogger<DataFetchMetadataRepository>.Instance);
+        _raceRepository = new RaceRepository(contextFactory.CreateDbContext(), NullLogger<RaceRepository>.Instance);
         
         // Initialize HTTP client and F1 data services
         _httpClient = new HttpClient();
         _resultService = new ResultService(_httpClient, _resultRepository, _metadataRepository, _raceRepository, NullLogger<ResultService>.Instance);
+        _raceService = new RaceService(_httpClient, _raceRepository, _metadataRepository, NullLogger<RaceService>.Instance);
         _qualifyingService = new QualifyingService(_httpClient, _qualifyingRepository, NullLogger<QualifyingService>.Instance);
         _driverStandingService = new DriverStandingService(_httpClient, _driverStandingRepository, NullLogger<DriverStandingService>.Instance);
         _constructorStandingService = new ConstructorStandingService(_httpClient, _constructorStandingRepository, NullLogger<ConstructorStandingService>.Instance);
@@ -84,7 +91,8 @@ public class StandingsIntegrationTests : IDisposable
             _driverStandingService,
             _constructorStandingService,
             _resultService,
-            _qualifyingService);
+            _qualifyingService,
+            _raceService);
         
         _standingsService = new StandingsService(
             _standingRepository,
@@ -743,6 +751,33 @@ public class StandingsIntegrationTests : IDisposable
         // Assert
         score.Should().Be(driversWithPoints.Count * -20, "all incorrect predictions should give -20 penalty each");
         score.Should().BeNegative("predicting drivers with points as zero-pointers should result in negative score");
+    }
+
+    [Fact]
+    public async Task Group58_Season2026_AutoRecalcTest()
+    {
+        // Arrange
+        const int groupId = 58;
+        const string season = "2026";
+
+        // Act
+        var standings = await _standingsService.GetStandingsWithAutoRecalcAsync(groupId, season);
+
+        // Assert
+        standings.Should().NotBeNull();
+        Console.WriteLine($"Retrieved {standings.Count} standings for Group {groupId}, Season {season}");
+        
+        foreach (var standing in standings)
+        {
+            Console.WriteLine($"User: {standing.UserId}, Rank: {standing.Rank}, Score: {standing.TotalScore}, Updated: {standing.UpdatedAt}");
+            if (!string.IsNullOrEmpty(standing.CategoryScoresJson))
+            {
+                Console.WriteLine($"  Category Scores: {standing.CategoryScoresJson}");
+            }
+        }
+
+        // Verify standings were calculated/retrieved
+        standings.Should().HaveCountGreaterThan(0, "Group 58 should have members with standings");
     }
 
     private string GenerateRandomInviteCode()

@@ -219,7 +219,7 @@ export async function fetchZeroPointerFromApi(
     const res = await apiGetOptional<{ driverIds?: string[] }>(
       `/api/predictions/groups/${groupId}/zero-pointer`
     );
-    if (res?.driverIds != null && res.driverIds.length > 0) {
+    if (res?.driverIds != null) {
       return { driverIds: res.driverIds };
     }
     return null;

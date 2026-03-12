@@ -55,10 +55,61 @@ public class PitStopRepository
         }
     }
 
+    public async Task AddOrUpdateBatchAsync(IEnumerable<PitStop> pitStops, string season, string round)
+    {
+        var pitStopList = pitStops.ToList();
+        if (!pitStopList.Any()) return;
+
+        try
+        {
+            // Single query to get all existing pit stops for this season/round
+            var existingPitStops = await _context.PitStops
+                .Where(p => p.Season == season && p.Round == round)
+                .ToListAsync();
+
+            var existingDict = existingPitStops.ToDictionary(p => (p.DriverId, p.Stop));
+
+            var updatedCount = 0;
+            var addedCount = 0;
+
+            foreach (var pitStop in pitStopList)
+            {
+                if (existingDict.TryGetValue((pitStop.DriverId, pitStop.Stop), out var existing))
+                {
+                    // Update existing
+                    existing.Lap = pitStop.Lap;
+                    existing.Time = pitStop.Time;
+                    existing.Duration = pitStop.Duration;
+                    _context.PitStops.Update(existing);
+                    updatedCount++;
+                }
+                else
+                {
+                    // Add new
+                    pitStop.Season = season;
+                    pitStop.Round = round;
+                    await _context.PitStops.AddAsync(pitStop);
+                    addedCount++;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            
+            _logger.LogInformation("Batch saved pit stops for season {Season}, round {Round}: {Added} added, {Updated} updated",
+                season, round, addedCount, updatedCount);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error batch saving pit stops for season {Season}, round {Round}", season, round);
+            throw;
+        }
+    }
+
     public async Task<IEnumerable<PitStop>> GetByRaceAsync(string season, string round)
     {
         _logger.LogDebug("Fetching pit stops for season {Season}, round {Round}", season, round);
         var pitStops = await _context.PitStops
+            .AsNoTracking()
             .Where(p => p.Season == season && p.Round == round)
             .ToListAsync();
         
@@ -72,6 +123,7 @@ public class PitStopRepository
         _logger.LogDebug("Fetching pit stops for season {Season}, round {Round}, driver {DriverId}", 
             season, round, driverId);
         var pitStops = await _context.PitStops
+            .AsNoTracking()
             .Where(p => p.Season == season && p.Round == round && p.DriverId == driverId)
             .ToListAsync();
         
@@ -81,7 +133,7 @@ public class PitStopRepository
     public async Task<IEnumerable<PitStop>> GetAllAsync()
     {
         _logger.LogDebug("Fetching all pit stops");
-        var pitStops = await _context.PitStops.ToListAsync();
+        var pitStops = await _context.PitStops.AsNoTracking().ToListAsync();
         
         return pitStops
             .OrderBy(p => p.Season)

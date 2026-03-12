@@ -11,6 +11,7 @@ public class ScoringService
     private readonly ConstructorStandingService _constructorStandingService;
     private readonly ResultService _resultService;
     private readonly QualifyingService _qualifyingService;
+    private readonly RaceService _raceService;
 
     // Scoring constants
     private const int CHAMPIONSHIP_EXACT_MATCH_POINTS = 10;
@@ -25,13 +26,15 @@ public class ScoringService
         DriverStandingService driverStandingService,
         ConstructorStandingService constructorStandingService,
         ResultService resultService,
-        QualifyingService qualifyingService)
+        QualifyingService qualifyingService,
+        RaceService raceService)
     {
         _predictionRepository = predictionRepository;
         _driverStandingService = driverStandingService;
         _constructorStandingService = constructorStandingService;
         _resultService = resultService;
         _qualifyingService = qualifyingService;
+        _raceService = raceService;
     }
 
     /// <summary>
@@ -62,11 +65,16 @@ public class ScoringService
         if (standingsList?.ConstructorStandings == null || !standingsList.ConstructorStandings.Any())
             return 0;
 
+        // Build actual ranking with all constructors
+        // Those with numeric position come first, then those with positionText="-" are treated as position 22
         var actualRanking = standingsList.ConstructorStandings
-            .OrderBy(s => int.Parse(s.Position))
-            .Select(s => s.Constructor?.ConstructorId)
-            .Where(id => id != null)
-            .Cast<string>()
+            .Select(s => new {
+                ConstructorId = s.Constructor?.ConstructorId,
+                Position = int.TryParse(s.Position, out var pos) ? pos : 22
+            })
+            .Where(x => x.ConstructorId != null)
+            .OrderBy(x => x.Position)
+            .Select(x => x.ConstructorId!)
             .ToList();
 
         return CalculateChampionshipScore(prediction.RankedConstructorIds, actualRanking);
@@ -82,11 +90,16 @@ public class ScoringService
         if (standingsList?.DriverStandings == null || !standingsList.DriverStandings.Any())
             return 0;
 
+        // Build actual ranking with all drivers
+        // Those with numeric position come first, then those with positionText="-" are treated as position 22
         var actualRanking = standingsList.DriverStandings
-            .OrderBy(s => int.Parse(s.Position))
-            .Select(s => s.Driver?.DriverId)
-            .Where(id => id != null)
-            .Cast<string>()
+            .Select(s => new {
+                DriverId = s.Driver?.DriverId,
+                Position = int.TryParse(s.Position, out var pos) ? pos : 22
+            })
+            .Where(x => x.DriverId != null)
+            .OrderBy(x => x.Position)
+            .Select(x => x.DriverId!)
             .ToList();
 
         return CalculateChampionshipScore(prediction.RankedDriverIds, actualRanking);
@@ -193,6 +206,21 @@ public class ScoringService
         var prediction = await _predictionRepository.GetZeroPointerAsync(groupId, userId);
         if (prediction == null || prediction.DriverIds == null || !prediction.DriverIds.Any()) return 0;
 
+        // Zero Pointer should only score at the END OF THE SEASON
+        // Get total races for the season
+        var allRaces = await _raceService.GetRacesForSeasonAsync(season);
+        var totalRaces = allRaces.Count();
+        
+        // Get latest round with results
+        var latestRound = await _resultService.GetLatestRoundWithResultsAsync(season);
+        
+        // If season is not complete, return 0 (no points yet)
+        if (!latestRound.HasValue || latestRound.Value < totalRaces)
+        {
+            return 0;
+        }
+
+        // Season is complete - calculate Zero Pointer scores
         // Use cache-first method for better performance
         var standingsList = await _driverStandingService.GetDriverStandingsBySeasonCachedAsync(season);
         if (standingsList?.DriverStandings == null) return 0;
@@ -232,28 +260,42 @@ public class ScoringService
 
     public async Task<Dictionary<string, int>> CalculateAllCategoryScoresAsync(int groupId, string userId, string season)
     {
+        // Calculate scores sequentially to avoid DbContext concurrency issues
+        // The async/await pattern already provides adequate concurrency at the database level
+        var constructorChamp = await CalculateConstructorChampionshipScoreAsync(groupId, userId, season);
+        var driverChamp = await CalculateDriverChampionshipScoreAsync(groupId, userId, season);
+        var driverDraft = await CalculateDriverDraftScoreAsync(groupId, userId, season);
+        var destructor = await CalculateDestructorScoreAsync(groupId, userId, season);
+        var mrSaturday = await CalculateMrSaturdayScoreAsync(groupId, userId, season);
+        var zeroPointer = await CalculateZeroPointerScoreAsync(groupId, userId, season);
+        var wildcard = await CalculateWildcardScoreAsync(groupId, userId);
+
         return new Dictionary<string, int>
         {
-            ["constructorChampionship"] = await CalculateConstructorChampionshipScoreAsync(groupId, userId, season),
-            ["driverChampionship"] = await CalculateDriverChampionshipScoreAsync(groupId, userId, season),
-            ["driverDraft"] = await CalculateDriverDraftScoreAsync(groupId, userId, season),
-            ["destructor"] = await CalculateDestructorScoreAsync(groupId, userId, season),
-            ["mrSaturday"] = await CalculateMrSaturdayScoreAsync(groupId, userId, season),
-            ["zeroPointer"] = await CalculateZeroPointerScoreAsync(groupId, userId, season),
-            ["wildcard"] = await CalculateWildcardScoreAsync(groupId, userId)
+            ["constructorChampionship"] = constructorChamp,
+            ["driverChampionship"] = driverChamp,
+            ["driverDraft"] = driverDraft,
+            ["destructor"] = destructor,
+            ["mrSaturday"] = mrSaturday,
+            ["zeroPointer"] = zeroPointer,
+            ["wildcard"] = wildcard
         };
     }
 
     private int CalculateChampionshipScore(List<string> predicted, List<string> actual)
     {
         int score = 0;
+        const int BASELINE_POINTS = 20;
 
-        for (int i = 0; i < Math.Min(predicted.Count, actual.Count); i++)
+        for (int i = 0; i < predicted.Count; i++)
         {
-            if (predicted[i] == actual[i])
+            // Each prediction starts with 20 points baseline
+            int predictionScore = BASELINE_POINTS;
+
+            if (i < actual.Count && predicted[i] == actual[i])
             {
-                // Exact match
-                score += CHAMPIONSHIP_EXACT_MATCH_POINTS;
+                // Exact match: baseline + bonus
+                predictionScore += CHAMPIONSHIP_EXACT_MATCH_POINTS;
             }
             else
             {
@@ -261,11 +303,19 @@ public class ScoringService
                 int actualPosition = actual.IndexOf(predicted[i]);
                 if (actualPosition != -1)
                 {
-                    // Calculate position delta
+                    // Calculate position delta and deduct penalty
                     int delta = Math.Abs(i - actualPosition);
-                    score += delta * CHAMPIONSHIP_POSITION_PENALTY;
+                    predictionScore += delta * CHAMPIONSHIP_POSITION_PENALTY; // Negative penalty
+                }
+                else
+                {
+                    // Driver/constructor not in the actual standings - assume worst position (22)
+                    int delta = Math.Abs(i - 21); // 21 because index is 0-based, position 22
+                    predictionScore += delta * CHAMPIONSHIP_POSITION_PENALTY;
                 }
             }
+
+            score += predictionScore;
         }
 
         return score;
@@ -332,10 +382,16 @@ public class ScoringService
                 CategoryScores = new Dictionary<string, int>()
             };
 
-            // For Driver Draft, Destructor, MrSaturday - calculate points earned in this specific round
-            var destructorPoints = await CalculateDestructorScoreForRoundAsync(groupId, userId, season, raceInfo.Round);
-            var mrSaturdayPoints = await CalculateMrSaturdayScoreForRoundAsync(groupId, userId, season, raceInfo.Round);
-            var driverDraftPoints = await CalculateDriverDraftScoreForRoundAsync(groupId, userId, season, raceInfo.Round);
+            // Parallelize per-round score calculations
+            var destructorTask = CalculateDestructorScoreForRoundAsync(groupId, userId, season, raceInfo.Round);
+            var mrSaturdayTask = CalculateMrSaturdayScoreForRoundAsync(groupId, userId, season, raceInfo.Round);
+            var driverDraftTask = CalculateDriverDraftScoreForRoundAsync(groupId, userId, season, raceInfo.Round);
+
+            await Task.WhenAll(destructorTask, mrSaturdayTask, driverDraftTask);
+
+            var destructorPoints = await destructorTask;
+            var mrSaturdayPoints = await mrSaturdayTask;
+            var driverDraftPoints = await driverDraftTask;
 
             roundScore.CategoryScores["Destructor"] = destructorPoints;
             roundScore.CategoryScores["MrSaturday"] = mrSaturdayPoints;
@@ -360,13 +416,20 @@ public class ScoringService
         // Add end-of-season categories to the last round (if races exist)
         if (roundScores.Any())
         {
-            var driverChampPoints = await CalculateDriverChampionshipScoreAsync(groupId, userId, season);
-            var constructorChampPoints = await CalculateConstructorChampionshipScoreAsync(groupId, userId, season);
-            var zeroPointerPoints = await CalculateZeroPointerScoreAsync(groupId, userId, season);
-            var wildcardPoints = await CalculateWildcardScoreAsync(groupId, userId);
-            
-            // Driver Draft should be based on FINAL season standings, not accumulated per round
-            var driverDraftSeasonTotal = await CalculateDriverDraftScoreAsync(groupId, userId, season);
+            // Parallelize season-end score calculations
+            var driverChampTask = CalculateDriverChampionshipScoreAsync(groupId, userId, season);
+            var constructorChampTask = CalculateConstructorChampionshipScoreAsync(groupId, userId, season);
+            var zeroPointerTask = CalculateZeroPointerScoreAsync(groupId, userId, season);
+            var wildcardTask = CalculateWildcardScoreAsync(groupId, userId);
+            var driverDraftSeasonTask = CalculateDriverDraftScoreAsync(groupId, userId, season);
+
+            await Task.WhenAll(driverChampTask, constructorChampTask, zeroPointerTask, wildcardTask, driverDraftSeasonTask);
+
+            var driverChampPoints = await driverChampTask;
+            var constructorChampPoints = await constructorChampTask;
+            var zeroPointerPoints = await zeroPointerTask;
+            var wildcardPoints = await wildcardTask;
+            var driverDraftSeasonTotal = await driverDraftSeasonTask;
 
             var lastRound = roundScores[^1];
             lastRound.CategoryScores["DriverChampionship"] = driverChampPoints;

@@ -43,6 +43,7 @@ public class ConstructorStandingRepository
     public async Task<List<ConstructorStanding>> GetBySeasonAndRoundAsync(string season, string round)
     {
         return await _context.ConstructorStandings
+            .AsNoTracking()
             .Where(cs => cs.Season == season && cs.Round == round)
             .OrderBy(cs => int.Parse(cs.Position))
             .ToListAsync();
@@ -53,6 +54,7 @@ public class ConstructorStandingRepository
         // Get the latest round for this season
         // Can't use int.Parse in LINQ, so fetch distinct rounds and parse in memory
         var rounds = await _context.ConstructorStandings
+            .AsNoTracking()
             .Where(cs => cs.Season == season)
             .Select(cs => cs.Round)
             .Distinct()
@@ -64,22 +66,28 @@ public class ConstructorStandingRepository
         var maxRound = rounds.Max(r => int.Parse(r));
 
         var standings = await _context.ConstructorStandings
+            .AsNoTracking()
             .Where(cs => cs.Season == season && cs.Round == maxRound.ToString())
             .ToListAsync();
 
         // Sort in memory since int.Parse can't be translated to SQL
-        return standings.OrderBy(cs => int.Parse(cs.Position)).ToList();
+        // Filter out any standings with empty Position before parsing
+        return standings
+            .Where(cs => !string.IsNullOrEmpty(cs.Position))
+            .OrderBy(cs => int.Parse(cs.Position))
+            .ToList();
     }
 
     public async Task<ConstructorStanding?> GetByConstructorAsync(string season, string round, string constructorId)
     {
         return await _context.ConstructorStandings
+            .AsNoTracking()
             .FirstOrDefaultAsync(cs => cs.Season == season && cs.Round == round && cs.ConstructorId == constructorId);
     }
 
     public async Task<List<ConstructorStanding>> GetAllAsync()
     {
-        var standings = await _context.ConstructorStandings.ToListAsync();
+        var standings = await _context.ConstructorStandings.AsNoTracking().ToListAsync();
         
         return standings
             .OrderBy(cs => cs.Season)

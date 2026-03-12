@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useUser } from "@clerk/clerk-react";
 import { App } from "antd";
 import { useRecoilState, useSetRecoilState, useRecoilValue } from "recoil";
@@ -14,6 +14,8 @@ import { fetchRacesForSeasonFromApi, getFirstRaceDateFromRaces } from "../api/ra
 import {
   createGroupFromApi,
   fetchMyGroupsFromApi,
+  fetchGroupDetailFromApi,
+  mapGroupDetailApiToUserPredictions,
   fetchGroupByInviteCodeFromApi,
   joinGroupFromApi,
   leaveGroupFromApi,
@@ -35,7 +37,7 @@ import type { PredictionCategoryId } from "../types/predictions";
 import { createInitialGroupPredictionsData } from "../utils/groupPredictionsData";
 import type { Group } from "../types/group";
 import type { PredictionLockMode } from "../types/group";
-import type { MemberStanding } from "../types/predictions";
+import type { MemberStanding, UserPredictions } from "../types/predictions";
 
 /** Merge API standings with group members so every member appears. Use group.members as fallback when API returns []. */
 function mergeStandingsWithGroupMembers(
@@ -105,6 +107,10 @@ export default function Index() {
   const firstRaceDate = useRecoilValue(firstRaceDateState);
   const appDataLoading = useRecoilValue(appDataLoadingState);
   const selectedGroup = userGroups.find((g) => g.id === selectedGroupId);
+  // Ref to break infinite loop: after setUserGroups writes back, selectedGroup
+  // becomes a new object reference → would re-trigger the effect → DDOS.
+  const selectedGroupRef = useRef(selectedGroup);
+  selectedGroupRef.current = selectedGroup;
   const [groupData, setGroupData] = useRecoilState(
     groupPredictionsState(selectedGroupId ?? "_none")
   );
@@ -120,7 +126,7 @@ export default function Index() {
       currentUserDisplayName
     );
     return { ...p, lockedUserIds: [] };
-  }, [selectedGroup?.id, currentUserId, currentUserDisplayName]);
+  }, [selectedGroup, currentUserId, currentUserDisplayName]);
 
   // Load drivers, constructors, and first race date only when user selects a group (needed for predictions view).
   // Do not include appDataLoading in deps: setting it to true would re-run the effect, cleanup would set it false, and we'd start another fetch (request loop).
@@ -213,7 +219,7 @@ export default function Index() {
   useEffect(() => {
     if (
       !selectedGroupId ||
-      !selectedGroup ||
+      !selectedGroupRef.current ||
       !getApiBaseUrl() ||
       !isSignedIn
     )
@@ -267,6 +273,8 @@ export default function Index() {
     selectedGroup?.predictionsLocked,
     currentUserId,
     currentUserDisplayName,
+    setUserGroups,
+    setAllGroups,
     setGroupData,
   ]);
 

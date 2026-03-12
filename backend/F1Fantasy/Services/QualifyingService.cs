@@ -61,18 +61,20 @@ public class QualifyingService
             var races = apiResponse.MRData.RaceTable.Races;
             _logger.LogInformation("Retrieved qualifying for {Count} races in season {Season} from API", races.Count, season);
 
-            // Store qualifying results in repository
+            // Store qualifying results in repository using batch operations
             foreach (var race in races)
             {
-                if (race.QualifyingResults != null)
+                if (race.QualifyingResults != null && race.QualifyingResults.Any())
                 {
+                    // Populate IDs from nested objects
                     foreach (var qualifying in race.QualifyingResults)
                     {
-                        // Populate IDs from nested objects
                         qualifying.DriverId = qualifying.Driver?.DriverId ?? qualifying.DriverId;
                         qualifying.ConstructorId = qualifying.Constructor?.ConstructorId ?? qualifying.ConstructorId;
-                        await _qualifyingRepository.AddOrUpdateAsync(qualifying, race.Season, race.Round);
                     }
+                    
+                    // Batch save all qualifying results for this race
+                    await _qualifyingRepository.AddOrUpdateBatchAsync(race.QualifyingResults, race.Season, race.Round);
                 }
             }
 

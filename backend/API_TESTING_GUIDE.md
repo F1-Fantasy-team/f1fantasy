@@ -51,7 +51,7 @@ GET /api/groups
 Authorization: Bearer YOUR_TOKEN
 ```
 
-Response: Array of groups you're a member of, with enriched member data
+Response: **Lightweight** array of groups you're a member of. No display names or predictions - optimized for fast list views.
 
 ```json
 [
@@ -69,16 +69,12 @@ Response: Array of groups you're a member of, with enriched member data
         "id": 1,
         "groupId": 1,
         "userId": "user_xxx",
-        "displayName": "John Doe",
-        "isAdmin": true,
         "joinedAt": "2025-02-22T14:00:00Z"
       },
       {
         "id": 2,
         "groupId": 1,
         "userId": "user_yyy",
-        "displayName": "Jane Smith",
-        "isAdmin": false,
         "joinedAt": "2025-02-22T15:30:00Z"
       }
     ]
@@ -86,13 +82,68 @@ Response: Array of groups you're a member of, with enriched member data
 ]
 ```
 
+**Note**: This endpoint returns basic group info only. For display names and predictions, use `GET /api/groups/{id}`.
+
 ### 3. Get Specific Group by ID
 ```http
 GET /api/groups/1
 Authorization: Bearer YOUR_TOKEN
 ```
 
-Response: Group details with all members and their display names from Clerk
+Response: Group details with all members, their display names from Clerk, **and all their predictions**
+
+```json
+{
+  "id": 1,
+  "name": "My F1 Fantasy League",
+  "inviteCode": "ABC12XYZ",
+  "lockMode": "admin",
+  "adminUserId": "user_xxx",
+  "predictionsLocked": false,
+  "lockedAt": null,
+  "createdAt": "2025-02-22T14:00:00Z",
+  "members": [
+    {
+      "id": 1,
+      "groupId": 1,
+      "userId": "user_xxx",
+      "displayName": "John Doe",
+      "isAdmin": true,
+      "joinedAt": "2025-02-22T14:00:00Z",
+      "driverChampionship": {
+        "id": 1,
+        "groupId": 1,
+        "userId": "user_xxx",
+        "rankedDriverIds": ["max_verstappen", "charles_leclerc", ...],
+        "createdAt": "2025-02-22T10:00:00Z"
+      },
+      "constructorChampionship": { ... },
+      "driverDraft": { ... },
+      "destructor": { ... },
+      "mrSaturday": { ... },
+      "zeroPointer": { ... },
+      "wildcard": { ... }
+    },
+    {
+      "id": 2,
+      "groupId": 1,
+      "userId": "user_yyy",
+      "displayName": "Jane Smith",
+      "isAdmin": false,
+      "joinedAt": "2025-02-22T15:30:00Z",
+      "driverChampionship": null,
+      "constructorChampionship": null,
+      "driverDraft": { ... },
+      "destructor": null,
+      "mrSaturday": null,
+      "zeroPointer": null,
+      "wildcard": { ... }
+    }
+  ]
+}
+```
+
+**Note**: Any prediction category that hasn't been submitted will be `null`. Perfect for displaying everyone's predictions in one call!
 
 ### 4. Get Group by Invite Code
 ```http
@@ -100,7 +151,7 @@ GET /api/groups/invite/ABC12XYZ
 Authorization: Bearer YOUR_TOKEN
 ```
 
-Response: Group details with members and display names (useful for preview before joining)
+Response: Group details with members, display names, **and all predictions** (useful for preview before joining)
 
 ### 5. Join a Group
 ```http
@@ -317,7 +368,7 @@ POST /api/groups/1/unlock
 Authorization: Bearer ADMIN_TOKEN
 ```
 
-### 12. Get Standings (Auto-Recalculates)
+### 13. Get Standings (Auto-Recalculates)
 ```http
 GET /api/standings/groups/1?season=2025
 Authorization: Bearer YOUR_TOKEN
@@ -772,7 +823,50 @@ All endpoints return consistent error responses:
 
 ```json
 {
-  "error": "Descriptive error message"
+  "message": "Human-readable error message",
+  "statusCode": 400,
+  "path": "/api/example",
+  "timestamp": "2026-03-03T12:34:56.789Z",
+  "requestId": "8d274a5b-1c98-4a33-a3d9-f8ec4d6df2fd"
+}
+```
+
+Optional fields may also appear depending on the error type:
+
+- `error`: Short error label (e.g., `"Rate limit exceeded"`, `"Access denied"`)
+- `retryAfter`: Present on `429 Too Many Requests` responses
+- `detail` and `stackTrace`: Present only in development for unhandled exceptions
+
+The API also returns the same request correlation value in the response header:
+
+- `X-Request-Id: <uuid>`
+
+Use `requestId` / `X-Request-Id` to quickly locate all related server logs for a request.
+
+### Example: 403 Forbidden (Blacklisted IP)
+
+```json
+{
+  "error": "Access denied",
+  "message": "Your IP address has been blocked due to suspicious activity. Contact support if you believe this is an error.",
+  "requestId": "8d274a5b-1c98-4a33-a3d9-f8ec4d6df2fd",
+  "statusCode": 403,
+  "path": "/api/groups",
+  "timestamp": "2026-03-03T12:34:56.789Z"
+}
+```
+
+### Example: 429 Too Many Requests
+
+```json
+{
+  "error": "Rate limit exceeded",
+  "message": "Too many requests. Please slow down and try again later.",
+  "retryAfter": "60 seconds",
+  "requestId": "8d274a5b-1c98-4a33-a3d9-f8ec4d6df2fd",
+  "statusCode": 429,
+  "path": "/api/predictions/groups/1/driver-draft",
+  "timestamp": "2026-03-03T12:34:56.789Z"
 }
 ```
 

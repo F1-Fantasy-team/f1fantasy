@@ -50,7 +50,12 @@ builder.WebHost.ConfigureKestrel(options =>
 
 // Configure logging
 builder.Logging.ClearProviders();
-builder.Logging.AddConsole();
+builder.Logging.AddSimpleConsole(options =>
+{
+    options.IncludeScopes = true;
+    options.SingleLine = true;
+    options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ ";
+});
 builder.Logging.AddDebug();
 builder.Logging.SetMinimumLevel(LogLevel.Information);
 
@@ -75,6 +80,18 @@ builder.Services.AddDbContext<F1FantasyDbContext>(options =>
     {
         throw new InvalidOperationException("Database connection string 'DefaultConnection' not found. Please configure it in appsettings.json or environment variables.");
     }
+    
+    // Force optimal connection pooling parameters
+    // Remove any existing pooling params and add our own
+    connString = System.Text.RegularExpressions.Regex.Replace(
+        connString, 
+        @"(Pooling|Minimum Pool Size|Maximum Pool Size|Connection Idle Lifetime|Connection Pruning Interval)\s*=\s*[^;]*;?", 
+        "", 
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    
+    var poolingParams = "Pooling=true;Minimum Pool Size=10;Maximum Pool Size=100;Connection Idle Lifetime=60;Connection Pruning Interval=5";
+    connString = connString.TrimEnd(';') + ";" + poolingParams;
+    
     options.UseNpgsql(connString, npgsqlOptions =>
     {
         // Set command timeout to prevent long-running queries (30 seconds)
@@ -106,6 +123,17 @@ builder.Services.AddDbContextFactory<F1FantasyDbContext>(options =>
     {
         throw new InvalidOperationException("Database connection string 'DefaultConnection' not found. Please configure it in appsettings.json or environment variables.");
     }
+    
+    // Force optimal connection pooling parameters
+    connString = System.Text.RegularExpressions.Regex.Replace(
+        connString, 
+        @"(Pooling|Minimum Pool Size|Maximum Pool Size|Connection Idle Lifetime|Connection Pruning Interval)\s*=\s*[^;]*;?", 
+        "", 
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    
+    var poolingParams = "Pooling=true;Minimum Pool Size=10;Maximum Pool Size=100;Connection Idle Lifetime=60;Connection Pruning Interval=5";
+    connString = connString.TrimEnd(';') + ";" + poolingParams;
+    
     options.UseNpgsql(connString, npgsqlOptions =>
     {
         npgsqlOptions.CommandTimeout(30);
@@ -164,34 +192,62 @@ builder.Services.AddSingleton<RateLimitViolationMonitor>();
 // Auto-lock background service
 builder.Services.AddHostedService<F1Fantasy.Services.AutoLockService>();
 
-// Configure Clerk JWT Authentication
+// Validate Clerk secret key (required for ClerkService backend API calls)
 var clerkSecretKey = Environment.GetEnvironmentVariable("CLERK_SECRET_KEY");
 if (string.IsNullOrEmpty(clerkSecretKey))
 {
-    throw new InvalidOperationException("CLERK_SECRET_KEY environment variable is not set. Please configure it in .env file.");
+    throw new InvalidOperationException("CLERK_SECRET_KEY environment variable is not set. Required for Clerk Backend API.");
 }
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        // Replace with YOUR actual Frontend API URL from Clerk Dashboard
-        var frontendApiUrl = "https://clerk.f1fantasy.no/";  // ← change this!
+// Configure Clerk JWT Authentication
+// Accept tokens from multiple Clerk instances
+var clerkUrls = new[]
+{
+    "https://clerk.f1fantasy.no",              // Production
+    "https://above-stag-28.clerk.accounts.dev" // Development
+};
 
-        options.Authority = frontendApiUrl;                     // Enables discovery
-        options.MetadataAddress = $"{frontendApiUrl}/.well-known/openid-configuration"; // optional but good
-        options.RequireHttpsMetadata = true;                    // keep true in prod
+// Register MultiClerkConfigurationManager as singleton using DI
+builder.Services.AddSingleton<F1Fantasy.Services.MultiClerkConfigurationManager>(sp =>
+{
+    var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
+    var logger = sp.GetRequiredService<ILogger<F1Fantasy.Services.MultiClerkConfigurationManager>>();
+    var httpClient = httpClientFactory.CreateClient("ClerkConfiguration");
+    
+    // Configure timeout for OIDC configuration requests
+    httpClient.Timeout = TimeSpan.FromSeconds(30);
+    
+    return new F1Fantasy.Services.MultiClerkConfigurationManager(
+        clerkUrls,
+        httpClient,
+        logger
+    );
+});
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer();
+
+builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+    .Configure<F1Fantasy.Services.MultiClerkConfigurationManager>((options, configManager) =>
+    {
+        options.ConfigurationManager = configManager;
+        options.RequireHttpsMetadata = true;
+
+        // Get configuration and valid issuers (will use cached values from startup warmup)
+        var configuration = configManager.GetConfigurationAsync(CancellationToken.None).GetAwaiter().GetResult();
+        var validIssuers = configManager.GetValidIssuers();
 
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidateIssuer = true,                              // will use discovered issuer
-            ValidateAudience = false,                           // Clerk doesn't require/validate aud by default
+            ValidateIssuer = true,
+            // Use issuers derived from discovery documents (normalized)
+            ValidIssuers = validIssuers,
+            ValidateAudience = false,  // Clerk doesn't use audience validation
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            // Do NOT set ValidIssuer or ValidIssuers manually — let discovery handle it
             ClockSkew = TimeSpan.FromMinutes(5)
         };
 
-        // Optional: log more details on failure
         options.Events = new JwtBearerEvents
         {
             OnAuthenticationFailed = context =>
@@ -203,8 +259,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             OnTokenValidated = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                var userId = context.Principal?.FindFirst("sub")?.Value; // Clerk uses "sub" for user ID
-                logger.LogInformation("Token validated successfully for user: {UserId}", userId);
+                var userId = context.Principal?.FindFirst("sub")?.Value;
+                var issuer = context.Principal?.FindFirst("iss")?.Value;
+                logger.LogInformation("Token validated for user {UserId} from {Issuer}", userId, issuer);
                 return Task.CompletedTask;
             }
         };
@@ -319,7 +376,11 @@ builder.Services.Configure<GzipCompressionProviderOptions>(options =>
 // Add response caching to reduce repeated requests
 builder.Services.AddResponseCaching();
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+    });
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
@@ -342,6 +403,9 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// Add request context middleware first to attach correlation id and total request timing
+app.UseMiddleware<RequestContextLoggingMiddleware>();
 
 // Add response compression early in pipeline (before other middleware)
 app.UseResponseCompression();
@@ -387,5 +451,37 @@ var logger = app.Services.GetRequiredService<ILogger<Program>>();
 logger.LogInformation("F1Fantasy API starting up...");
 logger.LogInformation("Environment: {Environment}", app.Environment.EnvironmentName);
 logger.LogInformation("Listening on port: {Port}", port);
+
+// Warm up OIDC configuration cache at startup (don't make first user wait ~1.4s)
+logger.LogInformation("Warming up OIDC configuration cache at startup...");
+var configManager = app.Services.GetRequiredService<F1Fantasy.Services.MultiClerkConfigurationManager>();
+try
+{
+    var warmupTask = configManager.GetConfigurationAsync(CancellationToken.None);
+    warmupTask.Wait(TimeSpan.FromSeconds(10)); // Timeout to prevent hanging startup
+    logger.LogInformation("OIDC configuration cache warmed successfully");
+}
+catch (Exception ex)
+{
+    // Don't crash startup if OIDC fetch fails - it will retry on first request
+    logger.LogWarning(ex, "Failed to warm OIDC configuration cache at startup. Will retry on first authenticated request.");
+}
+
+// Prewarm database connection pool
+logger.LogInformation("Prewarming database connection pool...");
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<F1FantasyDbContext>();
+    try
+    {
+        // Execute a simple query to open initial connections in the pool
+        var canConnect = await dbContext.Database.CanConnectAsync();
+        logger.LogInformation("Database connection pool prewarmed successfully. CanConnect: {CanConnect}", canConnect);
+    }
+    catch (Exception ex)
+    {
+        logger.LogWarning(ex, "Failed to prewarm database connection pool: {Message}", ex.Message);
+    }
+}
 
 app.Run();

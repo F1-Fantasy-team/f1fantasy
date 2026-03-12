@@ -65,6 +65,8 @@ public class LapTimingService
                 race.Laps.Count, season, round);
 
             // Flatten the nested structure: each lap has multiple timings (one per driver)
+            var allLapTimings = new List<LapTiming>();
+            
             foreach (var lap in race.Laps)
             {
                 if (lap.Timings == null || !lap.Timings.Any())
@@ -75,7 +77,7 @@ public class LapTimingService
 
                 foreach (var timing in lap.Timings)
                 {
-                    var lapTiming = new LapTiming
+                    allLapTimings.Add(new LapTiming
                     {
                         Season = season,
                         Round = round,
@@ -83,14 +85,15 @@ public class LapTimingService
                         DriverId = timing.DriverId,
                         Position = timing.Position,
                         Time = timing.Time
-                    };
-
-                    await _repository.AddOrUpdateAsync(lapTiming, season, round);
+                    });
                 }
             }
 
-            _logger.LogInformation("Successfully stored lap timings for {LapCount} laps, season {Season}, round {Round}", 
-                race.Laps.Count, season, round);
+            // Batch save all lap timings for this race
+            await _repository.AddOrUpdateBatchAsync(allLapTimings, season, round);
+
+            _logger.LogInformation("Successfully stored {Count} lap timings for {LapCount} laps, season {Season}, round {Round}", 
+                allLapTimings.Count, race.Laps.Count, season, round);
 
             return await BuildLapsFromCache(season, round);
         }

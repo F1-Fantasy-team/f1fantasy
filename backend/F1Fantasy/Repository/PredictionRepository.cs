@@ -6,230 +6,269 @@ namespace F1Fantasy.Repository;
 
 public class PredictionRepository
 {
-    private readonly F1FantasyDbContext _context;
+    private readonly IDbContextFactory<F1FantasyDbContext> _contextFactory;
 
-    public PredictionRepository(F1FantasyDbContext context)
+    public PredictionRepository(IDbContextFactory<F1FantasyDbContext> contextFactory)
     {
-        _context = context;
+        _contextFactory = contextFactory;
     }
 
     // Constructor Championship
     public async Task<ConstructorChampionshipPrediction?> GetConstructorChampionshipAsync(int groupId, string userId)
     {
-        return await _context.ConstructorChampionshipPredictions
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.ConstructorChampionshipPredictions
+            .AsNoTracking()
             .FirstOrDefaultAsync(p => p.GroupId == groupId && p.UserId == userId);
     }
 
     public async Task<List<ConstructorChampionshipPrediction>> GetAllConstructorChampionshipsAsync(int groupId)
     {
-        return await _context.ConstructorChampionshipPredictions
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.ConstructorChampionshipPredictions
+            .AsNoTracking()
             .Where(p => p.GroupId == groupId)
             .ToListAsync();
     }
 
     public async Task<ConstructorChampionshipPrediction> UpsertConstructorChampionshipAsync(ConstructorChampionshipPrediction prediction)
     {
-        var existing = await GetConstructorChampionshipAsync(prediction.GroupId, prediction.UserId);
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var existing = await context.ConstructorChampionshipPredictions
+            .FirstOrDefaultAsync(p => p.GroupId == prediction.GroupId && p.UserId == prediction.UserId);
         
         if (existing != null)
         {
             existing.RankedConstructorIds = prediction.RankedConstructorIds;
             existing.UpdatedAt = DateTime.UtcNow;
-            _context.ConstructorChampionshipPredictions.Update(existing);
+            context.ConstructorChampionshipPredictions.Update(existing);
         }
         else
         {
             prediction.CreatedAt = DateTime.UtcNow;
-            _context.ConstructorChampionshipPredictions.Add(prediction);
+            context.ConstructorChampionshipPredictions.Add(prediction);
         }
         
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
         return existing ?? prediction;
     }
 
     // Driver Championship
     public async Task<DriverChampionshipPrediction?> GetDriverChampionshipAsync(int groupId, string userId)
     {
-        return await _context.DriverChampionshipPredictions
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.DriverChampionshipPredictions
+            .AsNoTracking()
             .FirstOrDefaultAsync(p => p.GroupId == groupId && p.UserId == userId);
     }
 
     public async Task<List<DriverChampionshipPrediction>> GetAllDriverChampionshipsAsync(int groupId)
     {
-        return await _context.DriverChampionshipPredictions
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.DriverChampionshipPredictions
+            .AsNoTracking()
             .Where(p => p.GroupId == groupId)
             .ToListAsync();
     }
 
     public async Task<DriverChampionshipPrediction> UpsertDriverChampionshipAsync(DriverChampionshipPrediction prediction)
     {
-        var existing = await GetDriverChampionshipAsync(prediction.GroupId, prediction.UserId);
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var existing = await context.DriverChampionshipPredictions
+            .FirstOrDefaultAsync(p => p.GroupId == prediction.GroupId && p.UserId == prediction.UserId);
         
         if (existing != null)
         {
             existing.RankedDriverIds = prediction.RankedDriverIds;
             existing.UpdatedAt = DateTime.UtcNow;
-            _context.DriverChampionshipPredictions.Update(existing);
+            context.DriverChampionshipPredictions.Update(existing);
         }
         else
         {
             prediction.CreatedAt = DateTime.UtcNow;
-            _context.DriverChampionshipPredictions.Add(prediction);
+            context.DriverChampionshipPredictions.Add(prediction);
         }
         
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
         return existing ?? prediction;
     }
 
     // Driver Draft
     public async Task<DriverDraftPrediction?> GetDriverDraftAsync(int groupId, string userId)
     {
-        return await _context.DriverDraftPredictions
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.DriverDraftPredictions
+            .AsNoTracking()
             .FirstOrDefaultAsync(p => p.GroupId == groupId && p.UserId == userId);
     }
 
     public async Task<List<DriverDraftPrediction>> GetAllDriverDraftsAsync(int groupId)
     {
-        return await _context.DriverDraftPredictions
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.DriverDraftPredictions
+            .AsNoTracking()
             .Where(p => p.GroupId == groupId)
             .ToListAsync();
     }
 
     public async Task<DriverDraftPrediction> UpsertDriverDraftAsync(DriverDraftPrediction prediction)
     {
-        var existing = await GetDriverDraftAsync(prediction.GroupId, prediction.UserId);
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var existing = await context.DriverDraftPredictions
+            .FirstOrDefaultAsync(p => p.GroupId == prediction.GroupId && p.UserId == prediction.UserId);
         
         if (existing != null)
         {
             existing.Driver1Id = prediction.Driver1Id;
             existing.Driver2Id = prediction.Driver2Id;
             existing.UpdatedAt = DateTime.UtcNow;
-            _context.DriverDraftPredictions.Update(existing);
+            context.DriverDraftPredictions.Update(existing);
         }
         else
         {
             prediction.CreatedAt = DateTime.UtcNow;
-            _context.DriverDraftPredictions.Add(prediction);
+            context.DriverDraftPredictions.Add(prediction);
         }
         
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
         return existing ?? prediction;
     }
 
     // Destructors
     public async Task<DestructorPrediction?> GetDestructorAsync(int groupId, string userId)
     {
-        return await _context.DestructorPredictions
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.DestructorPredictions
+            .AsNoTracking()
             .FirstOrDefaultAsync(p => p.GroupId == groupId && p.UserId == userId);
     }
 
     public async Task<List<DestructorPrediction>> GetAllDestructorsAsync(int groupId)
     {
-        return await _context.DestructorPredictions
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.DestructorPredictions
+            .AsNoTracking()
             .Where(p => p.GroupId == groupId)
             .ToListAsync();
     }
 
     public async Task<DestructorPrediction> UpsertDestructorAsync(DestructorPrediction prediction)
     {
-        var existing = await GetDestructorAsync(prediction.GroupId, prediction.UserId);
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var existing = await context.DestructorPredictions
+            .FirstOrDefaultAsync(p => p.GroupId == prediction.GroupId && p.UserId == prediction.UserId);
         
         if (existing != null)
         {
             existing.Driver1Id = prediction.Driver1Id;
             existing.Driver2Id = prediction.Driver2Id;
             existing.UpdatedAt = DateTime.UtcNow;
-            _context.DestructorPredictions.Update(existing);
+            context.DestructorPredictions.Update(existing);
         }
         else
         {
             prediction.CreatedAt = DateTime.UtcNow;
-            _context.DestructorPredictions.Add(prediction);
+            context.DestructorPredictions.Add(prediction);
         }
         
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
         return existing ?? prediction;
     }
 
     // Mr Saturday
     public async Task<MrSaturdayPrediction?> GetMrSaturdayAsync(int groupId, string userId)
     {
-        return await _context.MrSaturdayPredictions
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.MrSaturdayPredictions
+            .AsNoTracking()
             .FirstOrDefaultAsync(p => p.GroupId == groupId && p.UserId == userId);
     }
 
     public async Task<List<MrSaturdayPrediction>> GetAllMrSaturdaysAsync(int groupId)
     {
-        return await _context.MrSaturdayPredictions
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.MrSaturdayPredictions
+            .AsNoTracking()
             .Where(p => p.GroupId == groupId)
             .ToListAsync();
     }
 
     public async Task<MrSaturdayPrediction> UpsertMrSaturdayAsync(MrSaturdayPrediction prediction)
     {
-        var existing = await GetMrSaturdayAsync(prediction.GroupId, prediction.UserId);
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var existing = await context.MrSaturdayPredictions
+            .FirstOrDefaultAsync(p => p.GroupId == prediction.GroupId && p.UserId == prediction.UserId);
         
         if (existing != null)
         {
             existing.Driver1Id = prediction.Driver1Id;
             existing.Driver2Id = prediction.Driver2Id;
             existing.UpdatedAt = DateTime.UtcNow;
-            _context.MrSaturdayPredictions.Update(existing);
+            context.MrSaturdayPredictions.Update(existing);
         }
         else
         {
             prediction.CreatedAt = DateTime.UtcNow;
-            _context.MrSaturdayPredictions.Add(prediction);
+            context.MrSaturdayPredictions.Add(prediction);
         }
         
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
         return existing ?? prediction;
     }
 
     // Zero Pointers
     public async Task<ZeroPointerPrediction?> GetZeroPointerAsync(int groupId, string userId)
     {
-        return await _context.ZeroPointerPredictions
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.ZeroPointerPredictions
+            .AsNoTracking()
             .FirstOrDefaultAsync(p => p.GroupId == groupId && p.UserId == userId);
     }
 
     public async Task<List<ZeroPointerPrediction>> GetAllZeroPointersAsync(int groupId)
     {
-        return await _context.ZeroPointerPredictions
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.ZeroPointerPredictions
+            .AsNoTracking()
             .Where(p => p.GroupId == groupId)
             .ToListAsync();
     }
 
     public async Task<ZeroPointerPrediction> UpsertZeroPointerAsync(ZeroPointerPrediction prediction)
     {
-        var existing = await GetZeroPointerAsync(prediction.GroupId, prediction.UserId);
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var existing = await context.ZeroPointerPredictions
+            .FirstOrDefaultAsync(p => p.GroupId == prediction.GroupId && p.UserId == prediction.UserId);
         
         if (existing != null)
         {
             existing.DriverIds = prediction.DriverIds;
             existing.UpdatedAt = DateTime.UtcNow;
-            _context.ZeroPointerPredictions.Update(existing);
+            context.ZeroPointerPredictions.Update(existing);
         }
         else
         {
             prediction.CreatedAt = DateTime.UtcNow;
-            _context.ZeroPointerPredictions.Add(prediction);
+            context.ZeroPointerPredictions.Add(prediction);
         }
         
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
         return existing ?? prediction;
     }
 
     // Wildcard
     public async Task<WildcardPrediction?> GetWildcardAsync(int groupId, string userId)
     {
-        return await _context.WildcardPredictions
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.WildcardPredictions
+            .AsNoTracking()
             .FirstOrDefaultAsync(p => p.GroupId == groupId && p.UserId == userId);
     }
 
     public async Task<List<WildcardPrediction>> GetAllWildcardsAsync(int groupId)
     {
-        return await _context.WildcardPredictions
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.WildcardPredictions
             .AsNoTracking()
             .Where(p => p.GroupId == groupId)
             .OrderBy(p => p.UserId)
@@ -238,7 +277,9 @@ public class PredictionRepository
 
     public async Task<WildcardPrediction> UpsertWildcardAsync(WildcardPrediction prediction)
     {
-        var existing = await GetWildcardAsync(prediction.GroupId, prediction.UserId);
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var existing = await context.WildcardPredictions
+            .FirstOrDefaultAsync(p => p.GroupId == prediction.GroupId && p.UserId == prediction.UserId);
         
         if (existing != null)
         {
@@ -246,19 +287,20 @@ public class PredictionRepository
             existing.PointsPotential = prediction.PointsPotential;
             existing.Fullfilled = prediction.Fullfilled;
             existing.UpdatedAt = DateTime.UtcNow;
-            _context.WildcardPredictions.Update(existing);
+            context.WildcardPredictions.Update(existing);
         }
         else
         {
             prediction.CreatedAt = DateTime.UtcNow;
-            _context.WildcardPredictions.Add(prediction);
+            context.WildcardPredictions.Add(prediction);
         }
         
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
         return existing ?? prediction;
     }
 
     // Get all predictions for a user (for tie-breaking in standings)
+    // Each Get method creates its own DbContext, so concurrent execution is safe
     public async Task<UserPredictions> GetAllPredictionsAsync(int groupId, string userId)
     {
         return new UserPredictions

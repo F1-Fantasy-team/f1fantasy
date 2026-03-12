@@ -85,6 +85,7 @@ public class GlobalExceptionHandler
             Message = message,
             Detail = _env.IsDevelopment() ? exception.Message : null,
             StackTrace = _env.IsDevelopment() ? exception.StackTrace : null,
+            RequestId = context.TraceIdentifier,
             Path = context.Request.Path,
             Timestamp = DateTime.UtcNow
         };

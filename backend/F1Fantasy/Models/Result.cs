@@ -13,7 +13,7 @@ public class Result
     public Driver Driver { get; set; } = new();
     public string ConstructorId { get; set; } = string.Empty;
     public Constructor Constructor { get; set; } = new();
-    public string Grid { get; set; } = string.Empty;
+    public string? Grid { get; set; } // Nullable because API can return null for sprint races or incomplete data
     public string Laps { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty; // Status text (e.g., "Finished", "Engine")
     public string? StatusId { get; set; } // Foreign key to Status table (e.g., "1", "5")

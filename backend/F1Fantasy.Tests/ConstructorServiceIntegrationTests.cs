@@ -43,7 +43,7 @@ public class ConstructorServiceIntegrationTests : IDisposable
             .UseNpgsql(connectionString)
             .Options;
         var context = new F1FantasyDbContext(options);
-        _constructorRepository = new ConstructorRepository(context);
+        _constructorRepository = new ConstructorRepository(context, NullLogger<ConstructorRepository>.Instance);
         _paginationState = new PaginationStateTracker();
         _constructorService = new ConstructorService(_httpClient, _constructorRepository, _paginationState, NullLogger<ConstructorService>.Instance);
     }
