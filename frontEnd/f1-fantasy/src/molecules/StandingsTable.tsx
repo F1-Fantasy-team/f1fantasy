@@ -23,10 +23,7 @@ export function StandingsTable({ standings, currentUserId, isLoading }: Standing
       dataIndex: "displayName",
       key: "displayName",
       render: (name: string, record: MemberStanding) => {
-        const raw = name && name.trim().length > 0 ? name.trim() : record.userId;
-        const looksLikeUserId = raw.startsWith("user_");
-        const baseName = looksLikeUserId ? (record.rank ? `Member ${record.rank}` : "Member") : raw;
-        const effectiveName = record.userId === currentUserId ? (looksLikeUserId ? "You" : baseName) : baseName;
+        const effectiveName = name && name.trim().length > 0 ? name.trim() : record.userId;
         return (
           <span className={record.userId === currentUserId ? "text-f1-red font-medium" : "text-f1-silver"}>
             {record.userId === currentUserId ? `${effectiveName} (you)` : effectiveName}
