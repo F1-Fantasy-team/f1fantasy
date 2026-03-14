@@ -41,7 +41,7 @@ public class PredictionRepository
         {
             existing.RankedConstructorIds = prediction.RankedConstructorIds;
             existing.UpdatedAt = DateTime.UtcNow;
-            context.ConstructorChampionshipPredictions.Update(existing);
+            // No need to call Update - entity is already tracked
         }
         else
         {
@@ -81,7 +81,7 @@ public class PredictionRepository
         {
             existing.RankedDriverIds = prediction.RankedDriverIds;
             existing.UpdatedAt = DateTime.UtcNow;
-            context.DriverChampionshipPredictions.Update(existing);
+            // No need to call Update - entity is already tracked
         }
         else
         {
@@ -122,7 +122,7 @@ public class PredictionRepository
             existing.Driver1Id = prediction.Driver1Id;
             existing.Driver2Id = prediction.Driver2Id;
             existing.UpdatedAt = DateTime.UtcNow;
-            context.DriverDraftPredictions.Update(existing);
+            // No need to call Update - entity is already tracked
         }
         else
         {
@@ -163,7 +163,7 @@ public class PredictionRepository
             existing.Driver1Id = prediction.Driver1Id;
             existing.Driver2Id = prediction.Driver2Id;
             existing.UpdatedAt = DateTime.UtcNow;
-            context.DestructorPredictions.Update(existing);
+            // No need to call Update - entity is already tracked
         }
         else
         {
@@ -204,7 +204,7 @@ public class PredictionRepository
             existing.Driver1Id = prediction.Driver1Id;
             existing.Driver2Id = prediction.Driver2Id;
             existing.UpdatedAt = DateTime.UtcNow;
-            context.MrSaturdayPredictions.Update(existing);
+            // No need to call Update - entity is already tracked
         }
         else
         {
@@ -244,7 +244,7 @@ public class PredictionRepository
         {
             existing.DriverIds = prediction.DriverIds;
             existing.UpdatedAt = DateTime.UtcNow;
-            context.ZeroPointerPredictions.Update(existing);
+            // No need to call Update - entity is already tracked
         }
         else
         {
@@ -287,7 +287,7 @@ public class PredictionRepository
             existing.PointsPotential = prediction.PointsPotential;
             existing.Fullfilled = prediction.Fullfilled;
             existing.UpdatedAt = DateTime.UtcNow;
-            context.WildcardPredictions.Update(existing);
+            // No need to call Update - entity is already tracked
         }
         else
         {

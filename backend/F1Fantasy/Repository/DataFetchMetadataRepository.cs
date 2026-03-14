@@ -24,7 +24,9 @@ public class DataFetchMetadataRepository
 
     public async Task RecordFetchAsync(string season, string dataType, int? latestRound, bool success, string? errorMessage = null)
     {
-        var existing = await GetMetadataAsync(season, dataType);
+        // Query with tracking enabled for update operation
+        var existing = await _context.DataFetchMetadata
+            .FirstOrDefaultAsync(m => m.Season == season && m.DataType == dataType);
         
         if (existing != null)
         {
@@ -32,7 +34,7 @@ public class DataFetchMetadataRepository
             existing.LatestRoundAtFetch = latestRound;
             existing.FetchSuccessful = success;
             existing.ErrorMessage = errorMessage;
-            _context.DataFetchMetadata.Update(existing);
+            // No need to call Update - entity is already tracked
         }
         else
         {

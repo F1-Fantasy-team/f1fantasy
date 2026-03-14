@@ -31,7 +31,9 @@ public class StandingRepository
 
     public async Task<Standing> UpsertAsync(Standing standing)
     {
-        var existing = await GetByUserAndGroupAsync(standing.GroupId, standing.UserId);
+        // Query with tracking enabled for update operation
+        var existing = await _context.Standings
+            .FirstOrDefaultAsync(s => s.GroupId == standing.GroupId && s.UserId == standing.UserId);
         
         if (existing != null)
         {
@@ -39,7 +41,7 @@ public class StandingRepository
             existing.Rank = standing.Rank;
             existing.CategoryScoresJson = standing.CategoryScoresJson;
             existing.UpdatedAt = DateTime.UtcNow;
-            _context.Standings.Update(existing);
+            // No need to call Update - entity is already tracked
         }
         else
         {
@@ -67,12 +69,11 @@ public class StandingRepository
         {
             if (existingStandings.TryGetValue(standing.UserId, out var existing))
             {
-                // Update existing
+                // Update existing - entity is already tracked
                 existing.TotalScore = standing.TotalScore;
                 existing.Rank = standing.Rank;
                 existing.CategoryScoresJson = standing.CategoryScoresJson;
                 existing.UpdatedAt = DateTime.UtcNow;
-                _context.Standings.Update(existing);
             }
             else
             {
