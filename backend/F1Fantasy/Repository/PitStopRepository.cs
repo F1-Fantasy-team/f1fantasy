@@ -76,11 +76,10 @@ public class PitStopRepository
             {
                 if (existingDict.TryGetValue((pitStop.DriverId, pitStop.Stop), out var existing))
                 {
-                    // Update existing
+                    // Update existing (tracked entity, no need to call Update())
                     existing.Lap = pitStop.Lap;
                     existing.Time = pitStop.Time;
                     existing.Duration = pitStop.Duration;
-                    _context.PitStops.Update(existing);
                     updatedCount++;
                 }
                 else

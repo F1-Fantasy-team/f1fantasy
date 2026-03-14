@@ -78,14 +78,13 @@ public class QualifyingRepository
             {
                 if (existingQualifyings.TryGetValue(qualifying.DriverId, out var existing))
                 {
-                    // Update existing
+                    // Update existing (tracked entity, no need to call Update())
                     existing.Number = qualifying.Number;
                     existing.Position = qualifying.Position;
                     existing.ConstructorId = qualifying.ConstructorId;
                     existing.Q1 = qualifying.Q1;
                     existing.Q2 = qualifying.Q2;
                     existing.Q3 = qualifying.Q3;
-                    _context.Qualifyings.Update(existing);
                     updatedCount++;
                 }
                 else

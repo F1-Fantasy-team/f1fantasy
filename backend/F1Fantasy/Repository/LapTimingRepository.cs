@@ -75,10 +75,9 @@ public class LapTimingRepository
             {
                 if (existingDict.TryGetValue((lapTiming.LapNumber, lapTiming.DriverId), out var existing))
                 {
-                    // Update existing
+                    // Update existing (tracked entity, no need to call Update())
                     existing.Position = lapTiming.Position;
                     existing.Time = lapTiming.Time;
-                    _context.LapTimings.Update(existing);
                     updatedCount++;
                 }
                 else

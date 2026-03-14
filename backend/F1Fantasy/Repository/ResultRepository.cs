@@ -85,7 +85,7 @@ public class ResultRepository
             {
                 if (existingResults.TryGetValue(result.DriverId, out var existing))
                 {
-                    // Update existing
+                    // Update existing (tracked entity, no need to call Update())
                     existing.Number = result.Number;
                     existing.Position = result.Position;
                     existing.PositionText = result.PositionText;
@@ -96,7 +96,6 @@ public class ResultRepository
                     existing.Status = result.Status;
                     existing.Time = result.Time;
                     existing.FastestLap = result.FastestLap;
-                    _context.Results.Update(existing);
                     updatedCount++;
                 }
                 else
