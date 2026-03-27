@@ -8,57 +8,69 @@ public class DriverStandingService
 {
     private readonly HttpClient _httpClient;
     private readonly DriverStandingRepository _repository;
+    private readonly DataFetchMetadataRepository _metadataRepository;
+    private readonly CacheStalenessService _cacheStalenessService;
     private readonly ILogger<DriverStandingService> _logger;
 
     public DriverStandingService(
         HttpClient httpClient,
         DriverStandingRepository repository,
+        DataFetchMetadataRepository metadataRepository,
+        CacheStalenessService cacheStalenessService,
         ILogger<DriverStandingService> logger)
     {
         _httpClient = httpClient;
         _httpClient.BaseAddress = new Uri("https://api.jolpi.ca/ergast/f1/");
         _repository = repository;
+        _metadataRepository = metadataRepository;
+        _cacheStalenessService = cacheStalenessService;
         _logger = logger;
     }
 
     /// <summary>
-    /// Cache-first: Returns cached driver standings if available, otherwise fetches from API
+    /// Smart cache-first: Returns cached driver standings if still valid, otherwise fetches from API
     /// </summary>
     public async Task<StandingsList?> GetDriverStandingsBySeasonCachedAsync(string season)
     {
         _logger.LogInformation("Checking cache for driver standings for season {Season}", season);
         
-        var cachedStandings = await _repository.GetBySeasonAsync(season);
-        if (cachedStandings.Any())
+        // Check if we should fetch based on staleness
+        var shouldFetch = await _cacheStalenessService.ShouldFetchAsync(season, DataType.DriverStandings, CacheStalenessOptions.ForStandings);
+        
+        if (!shouldFetch)
         {
-            // Convert DriverStanding to DriverStandingEntry
-            // Note: Driver navigation property is not loaded from DB, so we create it from DriverId
-            var driverStandingEntries = cachedStandings
-                .OrderBy(s => int.Parse(s.Position))
-                .Select(s => new DriverStandingEntry
-                {
-                    Position = s.Position,
-                    PositionText = s.PositionText,
-                    Points = s.Points,
-                    Wins = s.Wins,
-                    Driver = new Driver { DriverId = s.DriverId }, // Create Driver from DriverId
-                    Constructors = !string.IsNullOrEmpty(s.ConstructorId) 
-                        ? new List<Constructor> { new Constructor { ConstructorId = s.ConstructorId } } 
-                        : null
-                })
-                .ToList();
-
-            var standingsList = new StandingsList
+            var cachedStandings = await _repository.GetBySeasonAsync(season);
+            if (cachedStandings.Any())
             {
-                Season = season,
-                DriverStandings = driverStandingEntries
-            };
-            
-            _logger.LogInformation("Returning cached driver standings for season {Season} ({Count} drivers)", season, cachedStandings.Count());
-            return standingsList;
+                // Convert DriverStanding to DriverStandingEntry
+                // Note: Driver navigation property is not loaded from DB, so we create it from DriverId
+                var driverStandingEntries = cachedStandings
+                    .OrderBy(s => int.Parse(s.Position))
+                    .Select(s => new DriverStandingEntry
+                    {
+                        Position = s.Position,
+                        PositionText = s.PositionText,
+                        Points = s.Points,
+                        Wins = s.Wins,
+                        Driver = new Driver { DriverId = s.DriverId }, // Create Driver from DriverId
+                        Constructors = !string.IsNullOrEmpty(s.ConstructorId) 
+                            ? new List<Constructor> { new Constructor { ConstructorId = s.ConstructorId } } 
+                            : null
+                    })
+                    .ToList();
+
+                var standingsList = new StandingsList
+                {
+                    Season = season,
+                    DriverStandings = driverStandingEntries
+                };
+                
+                _logger.LogInformation("Returning cached driver standings for season {Season} ({Count} drivers)", season, cachedStandings.Count());
+                return standingsList;
+            }
         }
 
-        _logger.LogInformation("No cached driver standings found for season {Season}, fetching from API", season);
+        _logger.LogInformation("Cache stale or missing for season {Season}, fetching from API", season);
         return await GetDriverStandingsBySeasonAsync(season);
     }
 
@@ -133,16 +145,22 @@ public class DriverStandingService
             _logger.LogInformation("Successfully stored {Count} driver standings for season {Season}, round {Round}", 
                 standingsList.DriverStandings.Count, season, standingsList.Round);
 
+            // Record fetch metadata
+            var roundNumber = int.TryParse(standingsList.Round, out var r) ? r : (int?)null;
+            await _metadataRepository.RecordFetchAsync(season, "DriverStandings", roundNumber, true);
+
             return await BuildStandingsFromCache(season, standingsList.Round);
         }
         catch (HttpRequestException ex)
         {
             _logger.LogError(ex, "HTTP request failed while fetching driver standings for season {Season}", season);
+            await _metadataRepository.RecordFetchAsync(season, "DriverStandings", null, false, ex.Message);
             return await BuildStandingsFromCache(season, null);
         }
         catch (JsonException ex)
         {
             _logger.LogError(ex, "Failed to parse driver standings API response for season {Season}", season);
+            await _metadataRepository.RecordFetchAsync(season, "DriverStandings", null, false, ex.Message);
             return await BuildStandingsFromCache(season, null);
         }
         catch (Exception ex)

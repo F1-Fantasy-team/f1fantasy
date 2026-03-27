@@ -44,7 +44,10 @@ public class DriverStandingServiceIntegrationTests : IDisposable
             .Options;
         _context = new F1FantasyDbContext(options);
         _repository = new DriverStandingRepository(_context, NullLogger<DriverStandingRepository>.Instance);
-        _service = new DriverStandingService(_httpClient, _repository, NullLogger<DriverStandingService>.Instance);
+        var metadataRepository = new DataFetchMetadataRepository(_context, NullLogger<DataFetchMetadataRepository>.Instance);
+        var raceRepository = new RaceRepository(_context, NullLogger<RaceRepository>.Instance);
+        var cacheStalenessService = new CacheStalenessService(metadataRepository, raceRepository, NullLogger<CacheStalenessService>.Instance);
+        _service = new DriverStandingService(_httpClient, _repository, metadataRepository, cacheStalenessService, NullLogger<DriverStandingService>.Instance);
     }
 
     [Fact]
