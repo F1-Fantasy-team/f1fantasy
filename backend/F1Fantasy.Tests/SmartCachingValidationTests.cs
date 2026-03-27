@@ -59,6 +59,7 @@ public class SmartCachingValidationTests : IDisposable
         var result = await service.GetDriverStandingsBySeasonCachedAsync(Season);
         
         Assert.NotNull(result);
+        Assert.NotNull(result.DriverStandings);
         Assert.NotEmpty(result.DriverStandings);
         Console.WriteLine($"✅ Retrieved {result.DriverStandings.Count} driver standings");
         
@@ -70,7 +71,7 @@ public class SmartCachingValidationTests : IDisposable
         
         // Verify top driver points
         var topDriver = result.DriverStandings.First();
-        Console.WriteLine($"✅ Top driver: {topDriver.Driver.DriverId} with {topDriver.Points} points");
+        Console.WriteLine($"✅ Top driver: {topDriver.Driver?.DriverId} with {topDriver.Points} points");
     }
 
     [Fact]

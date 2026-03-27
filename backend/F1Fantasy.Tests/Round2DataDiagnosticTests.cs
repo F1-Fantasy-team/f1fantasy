@@ -94,6 +94,7 @@ public class Round2DataDiagnosticTests : IDisposable
             _scoringService,
             _resultService,
             _resultRepository,
+            _metadataRepository,
             NullLogger<StandingsService>.Instance);
     }
 

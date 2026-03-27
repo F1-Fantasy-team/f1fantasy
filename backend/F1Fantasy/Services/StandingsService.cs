@@ -12,6 +12,7 @@ public class StandingsService
     private readonly ScoringService _scoringService;
     private readonly ResultService _resultService;
     private readonly ResultRepository _resultRepository;
+    private readonly DataFetchMetadataRepository _metadataRepository;
     private readonly ILogger<StandingsService> _logger;
 
     public StandingsService(
@@ -21,6 +22,7 @@ public class StandingsService
         ScoringService scoringService,
         ResultService resultService,
         ResultRepository resultRepository,
+        DataFetchMetadataRepository metadataRepository,
         ILogger<StandingsService> logger)
     {
         _standingRepository = standingRepository;
@@ -29,6 +31,7 @@ public class StandingsService
         _scoringService = scoringService;
         _resultService = resultService;
         _resultRepository = resultRepository;
+        _metadataRepository = metadataRepository;
         _logger = logger;
     }
 
@@ -41,6 +44,18 @@ public class StandingsService
     {
         // Get existing standings
         var existingStandings = await _standingRepository.GetStandingsByGroupAsync(groupId);
+        
+        // CRITICAL FIX: Check if F1 data is NEWER than our standings
+        // If standings are older than the F1 data they depend on, we MUST recalculate
+        var f1DataNewerThanStandings = await IsF1DataNewerThanStandingsAsync(season, existingStandings);
+        
+        if (f1DataNewerThanStandings)
+        {
+            _logger.LogInformation("F1 standings data is newer than calculated standings for group {GroupId}, forcing recalculation", 
+                groupId);
+            await RecalculateStandingsAsync(groupId, season);
+            return await _standingRepository.GetStandingsByGroupAsync(groupId);
+        }
         
         // Use ResultService which will intelligently fetch from API only if needed
         var latestRoundWithResults = await _resultService.GetLatestRoundWithResultsAsync(season);
@@ -103,6 +118,55 @@ public class StandingsService
         
         _logger.LogDebug("Standings for group {GroupId} are up to date (round {Round})", groupId, lastCalculatedRound);
         return existingStandings;
+    }
+
+    /// <summary>
+    /// Check if F1 data (driver/constructor standings) is NEWER than the calculated standings
+    /// This is the KEY to automatic recalculation: if the data we depend on has been updated,
+    /// our cached standings are stale and must be recalculated
+    /// </summary>
+    private async Task<bool> IsF1DataNewerThanStandingsAsync(string season, List<Standing> existingStandings)
+    {
+        try
+        {
+            // If no standings exist yet, we need to calculate them
+            if (!existingStandings.Any())
+            {
+                _logger.LogDebug("No existing standings found, recalculation needed");
+                return true;
+            }
+            
+            // Get the timestamp of when standings were last calculated
+            var standingsUpdatedAt = existingStandings.Max(s => s.UpdatedAt);
+            
+            // Check if driver or constructor standings were fetched AFTER our standings were calculated
+            var dataTypes = new[] { "DriverStandings", "ConstructorStandings" };
+            
+            foreach (var dataType in dataTypes)
+            {
+                var metadata = await _metadataRepository.GetMetadataAsync(season, dataType);
+                
+                if (metadata != null && metadata.FetchSuccessful)
+                {
+                    // If F1 data was fetched AFTER we calculated standings, they're stale
+                    if (metadata.LastFetchedAt > standingsUpdatedAt)
+                    {
+                        var timeDiff = metadata.LastFetchedAt - standingsUpdatedAt;
+                        _logger.LogInformation("{DataType} was fetched {TimeDiff} after standings were calculated - triggering recalc", 
+                            dataType, timeDiff);
+                        return true;
+                    }
+                }
+            }
+            
+            _logger.LogDebug("All F1 data is older than or equal to standings calculation time - no recalc needed");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error checking if F1 data is newer than standings, playing it safe and forcing recalc");
+            return true; // Play it safe - recalc if we can't determine
+        }
     }
 
     public async Task RecalculateStandingsAsync(int groupId, string season)

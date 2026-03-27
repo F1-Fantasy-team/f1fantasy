@@ -108,6 +108,7 @@ public class Group58DigitalTwinTests : IDisposable
             _scoringService,
             _resultService,
             _resultRepository,
+            _metadataRepository,
             NullLogger<StandingsService>.Instance);
     }
 

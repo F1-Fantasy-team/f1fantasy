@@ -244,6 +244,7 @@ public class DriverDraftInvestigationTests : IDisposable
         var apiResponse = await _httpClient.GetStringAsync(apiUrl);
         
         var apiData = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonDocument>(apiResponse);
+        Assert.NotNull(apiData);
         var races = apiData.RootElement.GetProperty("MRData").GetProperty("RaceTable").GetProperty("Races");
         
         Console.WriteLine($"\nAPI Round {round} Results:");
@@ -288,7 +289,10 @@ public class DriverDraftInvestigationTests : IDisposable
                 var result = results[i];
                 var driverId = result.GetProperty("Driver").GetProperty("driverId").GetString();
                 var points = result.GetProperty("points").GetString();
-                apiDriverPoints[driverId] = points;
+                if (driverId != null && points != null)
+                {
+                    apiDriverPoints[driverId] = points;
+                }
             }
             
             foreach (var dbResult in dbResults)
@@ -321,6 +325,7 @@ public class DriverDraftInvestigationTests : IDisposable
         var apiUrl = $"https://api.jolpi.ca/ergast/f1/{Season}/results.json?limit=1000";
         var apiResponse = await _httpClient.GetStringAsync(apiUrl);
         var apiData = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonDocument>(apiResponse);
+        Assert.NotNull(apiData);
         
         var races = apiData.RootElement.GetProperty("MRData").GetProperty("RaceTable").GetProperty("Races");
         var apiRaceCount = races.GetArrayLength();
@@ -352,7 +357,9 @@ public class DriverDraftInvestigationTests : IDisposable
         if (apiRaceCount > 0)
         {
             var latestRace = races[apiRaceCount - 1];
-            var apiLatestRound = int.Parse(latestRace.GetProperty("round").GetString());
+            var roundString = latestRace.GetProperty("round").GetString();
+            Assert.NotNull(roundString);
+            var apiLatestRound = int.Parse(roundString);
             
             if (maxDbRound != apiLatestRound)
             {
