@@ -348,12 +348,14 @@ export async function putAdminWildcardFulfilledFromApi(
 // ----- Standings -----
 export async function fetchStandingsFromApi(
   groupId: string,
-  season: string = getCurrentSeason()
+  season: string = getCurrentSeason(),
+  timeoutMs?: number
 ): Promise<MemberStanding[] | null> {
   if (!getApiBaseUrl()) return null;
   try {
     const list = await apiGet<StandingApi[]>(
-      `/api/standings/groups/${groupId}?season=${season}`
+      `/api/standings/groups/${groupId}?season=${season}`,
+      timeoutMs
     );
     if (!Array.isArray(list)) return null;
     return mapStandingsApiToMemberStandings(list);
@@ -367,11 +369,12 @@ export async function fetchStandingsFromApi(
 export async function fetchGroupStandingsOnlyFromApi(
   groupId: string,
   currentUserId: string,
-  currentUserDisplayName: string
+  currentUserDisplayName: string,
+  timeoutMs?: number
 ): Promise<{ standings: MemberStanding[]; predictions: UserPredictions } | null> {
   if (!getApiBaseUrl()) return null;
   try {
-    const standings = await fetchStandingsFromApi(groupId);
+    const standings = await fetchStandingsFromApi(groupId, getCurrentSeason(), timeoutMs);
     const predictions: UserPredictions = {
       userId: currentUserId,
       displayName: currentUserDisplayName,

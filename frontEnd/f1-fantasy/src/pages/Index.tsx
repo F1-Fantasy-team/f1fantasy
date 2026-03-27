@@ -229,17 +229,30 @@ export default function Index() {
       return;
     let cancelled = false;
     let intervalId: number | undefined;
+    let isFetching = false; // Track if a fetch is currently in progress
 
     const fetchStandings = () => {
+      // Skip if already fetching to avoid concurrent requests during slow operations
+      if (isFetching) {
+        if (import.meta.env.DEV) {
+          console.log('[Standings] Skipping refetch - previous request still in progress');
+        }
+        return;
+      }
+
       const group = selectedGroupRef.current;
       if (!group) return;
       if (!standingsLoadedOnce) {
         setStandingsLoading(true);
       }
+      
+      isFetching = true;
+      // Set timeout to 2 minutes for slow recalculation operations
       fetchGroupStandingsOnlyFromApi(
         selectedGroupId,
         currentUserId,
-        currentUserDisplayName
+        currentUserDisplayName,
+        120000 // 2 minute timeout for slow standings recalculation
       ).then((result) => {
         if (cancelled || result == null) return;
         const standingsWithAllMembers = mergeStandingsWithGroupMembers(
@@ -260,7 +273,12 @@ export default function Index() {
           ).concat(result.predictions),
           predictionLock: group.predictionsLocked,
         }));
+      }).catch((err) => {
+        if (import.meta.env.DEV) {
+          console.warn('[Standings] Fetch error:', err);
+        }
       }).finally(() => {
+        isFetching = false;
         if (!cancelled) {
           if (!standingsLoadedOnce) {
             setStandingsLoading(false);

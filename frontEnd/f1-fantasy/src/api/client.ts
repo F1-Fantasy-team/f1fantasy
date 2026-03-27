@@ -56,22 +56,36 @@ async function parseJsonBody<T>(res: Response): Promise<T> {
   return JSON.parse(text) as T;
 }
 
-export async function apiGet<T>(path: string): Promise<T> {
+export async function apiGet<T>(path: string, timeoutMs?: number): Promise<T> {
   const url = baseUrl(path);
   const headers = await getAuthHeaders();
-  const res = await fetch(url, { method: "GET", headers });
-  if (!res.ok) throw new Error(await parseErrorMessage(res));
-  return parseJsonBody<T>(res);
+  const controller = new AbortController();
+  const timeoutId = timeoutMs ? setTimeout(() => controller.abort(), timeoutMs) : undefined;
+  
+  try {
+    const res = await fetch(url, { method: "GET", headers, signal: controller.signal });
+    if (!res.ok) throw new Error(await parseErrorMessage(res));
+    return parseJsonBody<T>(res);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
 }
 
 /** GET that returns null on 404 (e.g. no prediction yet). Use for optional resources. */
-export async function apiGetOptional<T>(path: string): Promise<T | null> {
+export async function apiGetOptional<T>(path: string, timeoutMs?: number): Promise<T | null> {
   const url = baseUrl(path);
   const headers = await getAuthHeaders();
-  const res = await fetch(url, { method: "GET", headers });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(await parseErrorMessage(res));
-  return parseJsonBody<T>(res);
+  const controller = new AbortController();
+  const timeoutId = timeoutMs ? setTimeout(() => controller.abort(), timeoutMs) : undefined;
+  
+  try {
+    const res = await fetch(url, { method: "GET", headers, signal: controller.signal });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(await parseErrorMessage(res));
+    return parseJsonBody<T>(res);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
 }
 
 export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
