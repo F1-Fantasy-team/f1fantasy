@@ -44,7 +44,8 @@ public class RaceServiceIntegrationTests : IDisposable
         var context = new F1FantasyDbContext(options);
         _raceRepository = new RaceRepository(context, NullLogger<RaceRepository>.Instance);
         var metadataRepository = new DataFetchMetadataRepository(context, NullLogger<DataFetchMetadataRepository>.Instance);
-        _raceService = new RaceService(_httpClient, _raceRepository, metadataRepository, NullLogger<RaceService>.Instance);
+        var cacheStalenessService = new CacheStalenessService(metadataRepository, _raceRepository, NullLogger<CacheStalenessService>.Instance);
+        _raceService = new RaceService(_httpClient, _raceRepository, metadataRepository, cacheStalenessService, NullLogger<RaceService>.Instance);
     }
 
     [Fact]

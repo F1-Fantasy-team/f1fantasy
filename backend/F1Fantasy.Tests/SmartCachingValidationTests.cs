@@ -81,10 +81,11 @@ public class SmartCachingValidationTests : IDisposable
         var repository = new ConstructorStandingRepository(_context, NullLogger<ConstructorStandingRepository>.Instance);
         var metadataRepo = new DataFetchMetadataRepository(_context, NullLogger<DataFetchMetadataRepository>.Instance);
         var raceRepo = new RaceRepository(_context, NullLogger<RaceRepository>.Instance);
+        var cacheStalenessService = new CacheStalenessService(metadataRepo, raceRepo, NullLogger<CacheStalenessService>.Instance);
         var httpClient = new HttpClient();
         var logger = NullLogger<ConstructorStandingService>.Instance;
         
-        var service = new ConstructorStandingService(httpClient, repository, metadataRepo, raceRepo, logger);
+        var service = new ConstructorStandingService(httpClient, repository, metadataRepo, cacheStalenessService, logger);
         
         // Check metadata before
         var metadataBefore = await metadataRepo.GetMetadataAsync(Season, "ConstructorStandings");
@@ -116,10 +117,11 @@ public class SmartCachingValidationTests : IDisposable
         var repository = new QualifyingRepository(_context, NullLogger<QualifyingRepository>.Instance);
         var metadataRepo = new DataFetchMetadataRepository(_context, NullLogger<DataFetchMetadataRepository>.Instance);
         var raceRepo = new RaceRepository(_context, NullLogger<RaceRepository>.Instance);
+        var cacheStalenessService = new CacheStalenessService(metadataRepo, raceRepo, NullLogger<CacheStalenessService>.Instance);
         var httpClient = new HttpClient();
         var logger = NullLogger<QualifyingService>.Instance;
         
-        var service = new QualifyingService(httpClient, repository, metadataRepo, raceRepo, logger);
+        var service = new QualifyingService(httpClient, repository, metadataRepo, cacheStalenessService, logger);
         
         // Check metadata before
         var metadataBefore = await metadataRepo.GetMetadataAsync(Season, "Qualifying");
@@ -169,14 +171,14 @@ public class SmartCachingValidationTests : IDisposable
             new HttpClient(), 
             new ConstructorStandingRepository(_context, NullLogger<ConstructorStandingRepository>.Instance), 
             metadataRepo, 
-            new RaceRepository(_context, NullLogger<RaceRepository>.Instance), 
+            cacheStalenessService, 
             NullLogger<ConstructorStandingService>.Instance);
             
         var qualifyingService = new QualifyingService(
             new HttpClient(), 
             new QualifyingRepository(_context, NullLogger<QualifyingRepository>.Instance), 
             metadataRepo, 
-            new RaceRepository(_context, NullLogger<RaceRepository>.Instance), 
+            cacheStalenessService, 
             NullLogger<QualifyingService>.Instance);
         
         // Fetch from all services

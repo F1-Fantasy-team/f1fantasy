@@ -83,13 +83,14 @@ public class Group58DigitalTwinTests : IDisposable
         
         // Initialize HTTP client and F1 data services
         _httpClient = new HttpClient();
-        _resultService = new ResultService(_httpClient, _resultRepository, _metadataRepository, _raceRepository, NullLogger<ResultService>.Instance);
-        _raceService = new RaceService(_httpClient, _raceRepository, _metadataRepository, NullLogger<RaceService>.Instance);
         var cacheStalenessService = new CacheStalenessService(_metadataRepository, _raceRepository, NullLogger<CacheStalenessService>.Instance);
         
-        _qualifyingService = new QualifyingService(_httpClient, _qualifyingRepository, _metadataRepository, _raceRepository, NullLogger<QualifyingService>.Instance);
+        _resultService = new ResultService(_httpClient, _resultRepository, _metadataRepository, cacheStalenessService, NullLogger<ResultService>.Instance);
+        _raceService = new RaceService(_httpClient, _raceRepository, _metadataRepository, cacheStalenessService, NullLogger<RaceService>.Instance);
+        
+        _qualifyingService = new QualifyingService(_httpClient, _qualifyingRepository, _metadataRepository, cacheStalenessService, NullLogger<QualifyingService>.Instance);
         _driverStandingService = new DriverStandingService(_httpClient, _driverStandingRepository, _metadataRepository, cacheStalenessService, NullLogger<DriverStandingService>.Instance);
-        _constructorStandingService = new ConstructorStandingService(_httpClient, _constructorStandingRepository, _metadataRepository, _raceRepository, NullLogger<ConstructorStandingService>.Instance);
+        _constructorStandingService = new ConstructorStandingService(_httpClient, _constructorStandingRepository, _metadataRepository, cacheStalenessService, NullLogger<ConstructorStandingService>.Instance);
         
         // Initialize services
         _scoringService = new ScoringService(
@@ -184,10 +185,13 @@ public class Group58DigitalTwinTests : IDisposable
             using (var ctx = new F1FantasyDbContext(new DbContextOptionsBuilder<F1FantasyDbContext>()
                 .UseNpgsql(Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")).Options))
             {
+                var metadata = new DataFetchMetadataRepository(ctx, NullLogger<DataFetchMetadataRepository>.Instance);
+                var raceRepo = new RaceRepository(ctx, NullLogger<RaceRepository>.Instance);
+                var cacheStaleness = new CacheStalenessService(metadata, raceRepo, NullLogger<CacheStalenessService>.Instance);
                 var svc = new ConstructorStandingService(_httpClient, 
                     new ConstructorStandingRepository(ctx, NullLogger<ConstructorStandingRepository>.Instance), 
-                    new DataFetchMetadataRepository(ctx, NullLogger<DataFetchMetadataRepository>.Instance),
-                    new RaceRepository(ctx, NullLogger<RaceRepository>.Instance),
+                    metadata,
+                    cacheStaleness,
                     NullLogger<ConstructorStandingService>.Instance);
                 var scoring = new ScoringService(_predictionRepository, _driverStandingService, svc, _resultService, _qualifyingService, _raceService);
                 categoryScores["constructorChampionship"] = await scoring.CalculateConstructorChampionshipScoreAsync(TwinGroupId, twinMember.UserId, Season);
@@ -229,9 +233,10 @@ public class Group58DigitalTwinTests : IDisposable
             using (var ctx = new F1FantasyDbContext(new DbContextOptionsBuilder<F1FantasyDbContext>()
                 .UseNpgsql(Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")).Options))
             {
+                var cacheStaleness = new CacheStalenessService(_metadataRepository, _raceRepository, NullLogger<CacheStalenessService>.Instance);
                 var svc = new ResultService(_httpClient,
                     new ResultRepository(ctx, NullLogger<ResultRepository>.Instance),
-                    _metadataRepository, _raceRepository,
+                    _metadataRepository, cacheStaleness,
                     NullLogger<ResultService>.Instance);
                 var scoring = new ScoringService(_predictionRepository, _driverStandingService, _constructorStandingService, svc, _qualifyingService, _raceService);
                 categoryScores["destructor"] = await scoring.CalculateDestructorScoreAsync(TwinGroupId, twinMember.UserId, Season);
@@ -241,10 +246,13 @@ public class Group58DigitalTwinTests : IDisposable
             using (var ctx = new F1FantasyDbContext(new DbContextOptionsBuilder<F1FantasyDbContext>()
                 .UseNpgsql(Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")).Options))
             {
+                var metadata = new DataFetchMetadataRepository(ctx, NullLogger<DataFetchMetadataRepository>.Instance);
+                var raceRepo = new RaceRepository(ctx, NullLogger<RaceRepository>.Instance);
+                var cacheStaleness = new CacheStalenessService(metadata, raceRepo, NullLogger<CacheStalenessService>.Instance);
                 var svc = new QualifyingService(_httpClient,
                     new QualifyingRepository(ctx, NullLogger<QualifyingRepository>.Instance),
-                    new DataFetchMetadataRepository(ctx, NullLogger<DataFetchMetadataRepository>.Instance),
-                    new RaceRepository(ctx, NullLogger<RaceRepository>.Instance),
+                    metadata,
+                    cacheStaleness,
                     NullLogger<QualifyingService>.Instance);
                 var scoring = new ScoringService(_predictionRepository, _driverStandingService, _constructorStandingService, _resultService, svc, _raceService);
                 categoryScores["mrSaturday"] = await scoring.CalculateMrSaturdayScoreAsync(TwinGroupId, twinMember.UserId, Season);

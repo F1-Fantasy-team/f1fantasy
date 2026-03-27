@@ -9,7 +9,7 @@ public class ResultService
     private readonly ApiHttpClient _apiHttpClient;
     private readonly ResultRepository _resultRepository;
     private readonly DataFetchMetadataRepository _metadataRepository;
-    private readonly RaceRepository _raceRepository;
+    private readonly CacheStalenessService _cacheStalenessService;
     private readonly ILogger<ResultService> _logger;
     private const string ApiBaseUrl = "https://api.jolpi.ca/ergast/f1";
 
@@ -17,13 +17,13 @@ public class ResultService
         HttpClient httpClient, 
         ResultRepository resultRepository,
         DataFetchMetadataRepository metadataRepository,
-        RaceRepository raceRepository,
+        CacheStalenessService cacheStalenessService,
         ILogger<ResultService> logger)
     {
         _apiHttpClient = new ApiHttpClient(httpClient);
         _resultRepository = resultRepository;
         _metadataRepository = metadataRepository;
-        _raceRepository = raceRepository;
+        _cacheStalenessService = cacheStalenessService;
         _logger = logger;
     }
 
@@ -343,7 +343,7 @@ public class ResultService
         var cachedLatest = await _resultRepository.GetLatestRoundWithResultsAsync(season);
         
         // Check if we should fetch based on race schedule and last fetch time
-        var shouldFetch = await ShouldFetchResultsAsync(season, cachedLatest);
+        var shouldFetch = await _cacheStalenessService.ShouldFetchAsync(season, DataType.Results, CacheStalenessOptions.ForResults);
         
         if (!shouldFetch && cachedLatest.HasValue)
         {
@@ -370,62 +370,6 @@ public class ResultService
         }
     }
 
-    private async Task<bool> ShouldFetchResultsAsync(string season, int? cachedLatestRound)
-    {
-        // Check metadata for last fetch time
-        var currentYear = DateTime.UtcNow.Year;
-        var seasonYear = int.Parse(season);
-        
-        // For past seasons, results are final - less frequent fetching
-        TimeSpan cacheExpiration = seasonYear < currentYear 
-            ? TimeSpan.FromDays(7) 
-            : TimeSpan.FromHours(1); // Current season - check more frequently
-        
-        var metadata = await _metadataRepository.GetMetadataAsync(season, "Results");
-        
-        if (metadata == null || !metadata.FetchSuccessful)
-        {
-            _logger.LogDebug("No valid metadata for Results/{Season}, should fetch", season);
-            return true;
-        }
-        
-        var age = DateTime.UtcNow - metadata.LastFetchedAt;
-        if (age > cacheExpiration)
-        {
-            _logger.LogDebug("Results cache expired for season {Season} (age: {Age}), should fetch", season, age);
-            return true;
-        }
-        
-        // Check if there might be a new race since last fetch
-        var races = await _raceRepository.GetBySeasonAsync(season);
-        var racesSinceLastFetch = races
-            .Where(r => DateTime.TryParse(r.Date, out var raceDate) && 
-                       raceDate > metadata.LastFetchedAt &&
-                       raceDate < DateTime.UtcNow.AddDays(1)) // Race is in the past (with 1 day buffer for results)
-            .ToList();
-        
-        if (racesSinceLastFetch.Any())
-        {
-            _logger.LogInformation("Found {Count} race(s) since last fetch for season {Season}, should fetch results", 
-                racesSinceLastFetch.Count, season);
-            return true;
-        }
-        
-        // Verify we have complete data for the cached latest round
-        if (cachedLatestRound.HasValue)
-        {
-            var resultsForRound = await _resultRepository.GetByRaceAsync(season, cachedLatestRound.Value.ToString());
-            if (!resultsForRound.Any())
-            {
-                _logger.LogWarning("Cached latest round {Round} has no results in DB, should fetch", cachedLatestRound);
-                return true;
-            }
-        }
-        
-        _logger.LogDebug("Results cache valid for season {Season}, skip fetch", season);
-        return false;
-    }
-
     /// <summary>
     /// Get results from cache first, only fetch from API if not cached
     /// </summary>
@@ -433,16 +377,21 @@ public class ResultService
     {
         _logger.LogDebug("Attempting to get results for season {Season} from cache first", season);
         
-        // Check cache first
-        var cached = await BuildRaceWithResultsFromCache(season);
-        if (cached.Any())
+        // Check if we should fetch based on staleness
+        var shouldFetch = await _cacheStalenessService.ShouldFetchAsync(season, DataType.Results, CacheStalenessOptions.ForResults);
+        
+        if (!shouldFetch)
         {
-            _logger.LogInformation("Using {Count} cached race results for season {Season}", cached.Count(), season);
-            return cached;
+            var cached = await BuildRaceWithResultsFromCache(season);
+            if (cached.Any())
+            {
+                _logger.LogInformation("Using {Count} cached race results for season {Season}", cached.Count(), season);
+                return cached;
+            }
         }
         
-        // Cache miss - fetch from API
-        _logger.LogInformation("No cached results for season {Season}, fetching from API", season);
+        // Cache stale or missing - fetch from API
+        _logger.LogInformation("Cache stale or missing for season {Season}, fetching from API", season);
         return await GetResultsBySeasonAsync(season);
     }
 }

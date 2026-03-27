@@ -9,6 +9,7 @@ public class RaceService
     private readonly ApiHttpClient _apiHttpClient;
     private readonly RaceRepository _raceRepository;
     private readonly DataFetchMetadataRepository _metadataRepository;
+    private readonly CacheStalenessService _cacheStalenessService;
     private readonly ILogger<RaceService> _logger;
     private const string ApiBaseUrl = "https://api.jolpi.ca/ergast/f1";
 
@@ -16,11 +17,13 @@ public class RaceService
         HttpClient httpClient, 
         RaceRepository raceRepository, 
         DataFetchMetadataRepository metadataRepository,
+        CacheStalenessService cacheStalenessService,
         ILogger<RaceService> logger)
     {
         _apiHttpClient = new ApiHttpClient(httpClient);
         _raceRepository = raceRepository;
         _metadataRepository = metadataRepository;
+        _cacheStalenessService = cacheStalenessService;
         _logger = logger;
     }
 
@@ -32,26 +35,24 @@ public class RaceService
         // Determine cache expiration based on season
         var currentYear = DateTime.UtcNow.Year;
         var seasonYear = int.Parse(season);
-        TimeSpan cacheExpiration;
         
-        if (seasonYear < currentYear)
+        // Use custom options for races since future seasons need special handling
+        var raceOptions = new CacheStalenessOptions
         {
-            // Past seasons never change - cache for 7 days
-            cacheExpiration = TimeSpan.FromDays(7);
-        }
-        else if (seasonYear == currentYear)
+            CurrentSeasonExpiration = TimeSpan.FromHours(6), // Current season - races might be added
+            PastSeasonExpiration = TimeSpan.FromDays(7),
+            CheckRaceSchedule = false, // Races don't depend on race schedule (they ARE the schedule)
+            RaceDataAvailabilityBuffer = TimeSpan.Zero
+        };
+        
+        // Override expiration for future seasons
+        if (seasonYear > currentYear)
         {
-            // Current season - cache for 6 hours (races might be added)
-            cacheExpiration = TimeSpan.FromHours(6);
-        }
-        else
-        {
-            // Future seasons - cache for 24 hours
-            cacheExpiration = TimeSpan.FromHours(24);
+            raceOptions.CurrentSeasonExpiration = TimeSpan.FromHours(24);
         }
         
         // Check if we should fetch from API based on cache age
-        var shouldFetch = await _metadataRepository.ShouldFetchAsync(season, "Races", cacheExpiration);
+        var shouldFetch = await _cacheStalenessService.ShouldFetchAsync(season, DataType.Races, raceOptions);
         
         if (!shouldFetch && cachedRaces.Any())
         {

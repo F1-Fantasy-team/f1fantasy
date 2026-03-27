@@ -9,7 +9,7 @@ public class QualifyingService
     private readonly ApiHttpClient _apiHttpClient;
     private readonly QualifyingRepository _qualifyingRepository;
     private readonly DataFetchMetadataRepository _metadataRepository;
-    private readonly RaceRepository _raceRepository;
+    private readonly CacheStalenessService _cacheStalenessService;
     private readonly ILogger<QualifyingService> _logger;
     private const string ApiBaseUrl = "https://api.jolpi.ca/ergast/f1";
 
@@ -17,13 +17,13 @@ public class QualifyingService
         HttpClient httpClient, 
         QualifyingRepository qualifyingRepository,
         DataFetchMetadataRepository metadataRepository,
-        RaceRepository raceRepository,
+        CacheStalenessService cacheStalenessService,
         ILogger<QualifyingService> logger)
     {
         _apiHttpClient = new ApiHttpClient(httpClient);
         _qualifyingRepository = qualifyingRepository;
         _metadataRepository = metadataRepository;
-        _raceRepository = raceRepository;
+        _cacheStalenessService = cacheStalenessService;
         _logger = logger;
     }
 
@@ -35,7 +35,7 @@ public class QualifyingService
         _logger.LogInformation("Checking cache for qualifying results for season {Season}", season);
         
         // Check if we should fetch based on staleness
-        var shouldFetch = await ShouldFetchQualifyingAsync(season);
+        var shouldFetch = await _cacheStalenessService.ShouldFetchAsync(season, DataType.Qualifying, CacheStalenessOptions.ForQualifying);
         
         if (!shouldFetch)
         {
@@ -49,51 +49,6 @@ public class QualifyingService
 
         _logger.LogInformation("Cache stale or missing for season {Season}, fetching from API", season);
         return await GetQualifyingBySeasonAsync(season);
-    }
-    
-    private async Task<bool> ShouldFetchQualifyingAsync(string season)
-    {
-        // Check metadata for last fetch time
-        var currentYear = DateTime.UtcNow.Year;
-        var seasonYear = int.Parse(season);
-        
-        // For past seasons, qualifying data is final - less frequent fetching
-        TimeSpan cacheExpiration = seasonYear < currentYear 
-            ? TimeSpan.FromDays(7) 
-            : TimeSpan.FromHours(1); // Current season - check more frequently
-        
-        var metadata = await _metadataRepository.GetMetadataAsync(season, "Qualifying");
-        
-        if (metadata == null || !metadata.FetchSuccessful)
-        {
-            _logger.LogDebug("No valid metadata for Qualifying/{Season}, should fetch", season);
-            return true;
-        }
-        
-        var age = DateTime.UtcNow - metadata.LastFetchedAt;
-        if (age > cacheExpiration)
-        {
-            _logger.LogDebug("Qualifying cache expired for season {Season} (age: {Age}), should fetch", season, age);
-            return true;
-        }
-        
-        // Check if there might be a new race since last fetch
-        var races = await _raceRepository.GetBySeasonAsync(season);
-        var racesSinceLastFetch = races
-            .Where(r => DateTime.TryParse(r.Date, out var raceDate) && 
-                       raceDate > metadata.LastFetchedAt &&
-                       raceDate < DateTime.UtcNow) // Qualifying happens before race
-            .ToList();
-        
-        if (racesSinceLastFetch.Any())
-        {
-            _logger.LogInformation("Found {Count} race(s) since last fetch for season {Season}, should fetch qualifying", 
-                racesSinceLastFetch.Count, season);
-            return true;
-        }
-        
-        _logger.LogDebug("Qualifying cache valid for season {Season}, skip fetch", season);
-        return false;
     }
 
     public async Task<IEnumerable<RaceWithQualifying>> GetQualifyingBySeasonAsync(string season)

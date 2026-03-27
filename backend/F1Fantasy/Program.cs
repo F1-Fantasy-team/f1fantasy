@@ -148,49 +148,50 @@ builder.Services.AddDbContextFactory<F1FantasyDbContext>(options =>
 // Add services to the container.
 builder.Services.AddHttpClient();
 builder.Services.AddMemoryCache(); // For caching Clerk user data and other frequently accessed data
-builder.Services.AddSingleton<F1Fantasy.Services.PaginationStateTracker>();
+builder.Services.AddSingleton<PaginationStateTracker>();
 builder.Services.AddScoped<F1Fantasy.Repository.DataFetchMetadataRepository>();
+builder.Services.AddScoped<CacheStalenessService>();
 builder.Services.AddScoped<F1Fantasy.Repository.RaceRepository>();
-builder.Services.AddScoped<F1Fantasy.Services.RaceService>();
+builder.Services.AddScoped<RaceService>();
 builder.Services.AddScoped<F1Fantasy.Repository.SeasonRepository>();
-builder.Services.AddScoped<F1Fantasy.Services.SeasonService>();
+builder.Services.AddScoped<SeasonService>();
 builder.Services.AddScoped<F1Fantasy.Repository.CircuitRepository>();
-builder.Services.AddScoped<F1Fantasy.Services.CircuitService>();
+builder.Services.AddScoped<CircuitService>();
 builder.Services.AddScoped<F1Fantasy.Repository.ConstructorRepository>();
-builder.Services.AddScoped<F1Fantasy.Services.ConstructorService>();
+builder.Services.AddScoped<ConstructorService>();
 builder.Services.AddScoped<F1Fantasy.Repository.DriverRepository>();
-builder.Services.AddScoped<F1Fantasy.Services.DriverService>();
+builder.Services.AddScoped<DriverService>();
 builder.Services.AddScoped<F1Fantasy.Repository.ResultRepository>();
-builder.Services.AddScoped<F1Fantasy.Services.ResultService>();
+builder.Services.AddScoped<ResultService>();
 builder.Services.AddScoped<F1Fantasy.Repository.QualifyingRepository>();
-builder.Services.AddScoped<F1Fantasy.Services.QualifyingService>();
+builder.Services.AddScoped<QualifyingService>();
 builder.Services.AddScoped<F1Fantasy.Repository.PitStopRepository>();
-builder.Services.AddScoped<F1Fantasy.Services.PitStopService>();
+builder.Services.AddScoped<PitStopService>();
 builder.Services.AddScoped<F1Fantasy.Repository.LapTimingRepository>();
-builder.Services.AddScoped<F1Fantasy.Services.LapTimingService>();
+builder.Services.AddScoped<LapTimingService>();
 builder.Services.AddScoped<F1Fantasy.Repository.DriverStandingRepository>();
-builder.Services.AddScoped<F1Fantasy.Services.DriverStandingService>();
+builder.Services.AddScoped<DriverStandingService>();
 builder.Services.AddScoped<F1Fantasy.Repository.ConstructorStandingRepository>();
-builder.Services.AddScoped<F1Fantasy.Services.ConstructorStandingService>();
+builder.Services.AddScoped<ConstructorStandingService>();
 builder.Services.AddScoped<F1Fantasy.Repository.StatusRepository>();
-builder.Services.AddScoped<F1Fantasy.Services.StatusService>();
+builder.Services.AddScoped<StatusService>();
 
 // Fantasy League Services
 builder.Services.AddScoped<F1Fantasy.Repository.GroupRepository>();
 builder.Services.AddScoped<F1Fantasy.Repository.PredictionRepository>();
 builder.Services.AddScoped<F1Fantasy.Repository.StandingRepository>();
-builder.Services.AddScoped<F1Fantasy.Services.GroupService>();
-builder.Services.AddScoped<F1Fantasy.Services.PredictionService>();
-builder.Services.AddScoped<F1Fantasy.Services.ScoringService>();
-builder.Services.AddScoped<F1Fantasy.Services.StandingsService>();
-builder.Services.AddScoped<F1Fantasy.Services.ClerkService>();
+builder.Services.AddScoped<GroupService>();
+builder.Services.AddScoped<PredictionService>();
+builder.Services.AddScoped<ScoringService>();
+builder.Services.AddScoped<StandingsService>();
+builder.Services.AddScoped<ClerkService>();
 
 // Rate limiting and security services
 builder.Services.AddSingleton<IIpBlacklistService, IpBlacklistService>();
 builder.Services.AddSingleton<RateLimitViolationMonitor>();
 
 // Auto-lock background service
-builder.Services.AddHostedService<F1Fantasy.Services.AutoLockService>();
+builder.Services.AddHostedService<AutoLockService>();
 
 // Validate Clerk secret key (required for ClerkService backend API calls)
 var clerkSecretKey = Environment.GetEnvironmentVariable("CLERK_SECRET_KEY");
@@ -208,16 +209,16 @@ var clerkUrls = new[]
 };
 
 // Register MultiClerkConfigurationManager as singleton using DI
-builder.Services.AddSingleton<F1Fantasy.Services.MultiClerkConfigurationManager>(sp =>
+builder.Services.AddSingleton<MultiClerkConfigurationManager>(sp =>
 {
     var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
-    var logger = sp.GetRequiredService<ILogger<F1Fantasy.Services.MultiClerkConfigurationManager>>();
+    var logger = sp.GetRequiredService<ILogger<MultiClerkConfigurationManager>>();
     var httpClient = httpClientFactory.CreateClient("ClerkConfiguration");
     
     // Configure timeout for OIDC configuration requests
     httpClient.Timeout = TimeSpan.FromSeconds(30);
     
-    return new F1Fantasy.Services.MultiClerkConfigurationManager(
+    return new MultiClerkConfigurationManager(
         clerkUrls,
         httpClient,
         logger
@@ -228,7 +229,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer();
 
 builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
-    .Configure<F1Fantasy.Services.MultiClerkConfigurationManager>((options, configManager) =>
+    .Configure<MultiClerkConfigurationManager>((options, configManager) =>
     {
         options.ConfigurationManager = configManager;
         options.RequireHttpsMetadata = true;
@@ -454,7 +455,7 @@ logger.LogInformation("Listening on port: {Port}", port);
 
 // Warm up OIDC configuration cache at startup (don't make first user wait ~1.4s)
 logger.LogInformation("Warming up OIDC configuration cache at startup...");
-var configManager = app.Services.GetRequiredService<F1Fantasy.Services.MultiClerkConfigurationManager>();
+var configManager = app.Services.GetRequiredService<MultiClerkConfigurationManager>();
 try
 {
     var warmupTask = configManager.GetConfigurationAsync(CancellationToken.None);

@@ -64,10 +64,10 @@ public class DriverDraftInvestigationTests : IDisposable
         
         _httpClient = new HttpClient();
         _driverStandingService = new DriverStandingService(_httpClient, _driverStandingRepository, metadataRepository, cacheStalenessService, NullLogger<DriverStandingService>.Instance);
-        _resultService = new ResultService(_httpClient, resultRepository, metadataRepository, raceRepository, NullLogger<ResultService>.Instance);
-        _raceService = new RaceService(_httpClient, raceRepository, metadataRepository, NullLogger<RaceService>.Instance);
-        _qualifyingService = new QualifyingService(_httpClient, qualifyingRepository, metadataRepository, raceRepository, NullLogger<QualifyingService>.Instance);
-        _constructorStandingService = new ConstructorStandingService(_httpClient, constructorStandingRepository, metadataRepository, raceRepository, NullLogger<ConstructorStandingService>.Instance);
+        _resultService = new ResultService(_httpClient, resultRepository, metadataRepository, cacheStalenessService, NullLogger<ResultService>.Instance);
+        _raceService = new RaceService(_httpClient, raceRepository, metadataRepository, cacheStalenessService, NullLogger<RaceService>.Instance);
+        _qualifyingService = new QualifyingService(_httpClient, qualifyingRepository, metadataRepository, cacheStalenessService, NullLogger<QualifyingService>.Instance);
+        _constructorStandingService = new ConstructorStandingService(_httpClient, constructorStandingRepository, metadataRepository, cacheStalenessService, NullLogger<ConstructorStandingService>.Instance);
         
         _scoringService = new ScoringService(
             _predictionRepository,

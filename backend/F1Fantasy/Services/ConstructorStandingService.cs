@@ -9,21 +9,21 @@ public class ConstructorStandingService
     private readonly HttpClient _httpClient;
     private readonly ConstructorStandingRepository _repository;
     private readonly DataFetchMetadataRepository _metadataRepository;
-    private readonly RaceRepository _raceRepository;
+    private readonly CacheStalenessService _cacheStalenessService;
     private readonly ILogger<ConstructorStandingService> _logger;
 
     public ConstructorStandingService(
         HttpClient httpClient, 
         ConstructorStandingRepository repository, 
         DataFetchMetadataRepository metadataRepository,
-        RaceRepository raceRepository,
+        CacheStalenessService cacheStalenessService,
         ILogger<ConstructorStandingService> logger)
     {
         _httpClient = httpClient;
         _httpClient.BaseAddress = new Uri("https://api.jolpi.ca/ergast/f1/");
         _repository = repository;
         _metadataRepository = metadataRepository;
-        _raceRepository = raceRepository;
+        _cacheStalenessService = cacheStalenessService;
         _logger = logger;
     }
 
@@ -35,7 +35,7 @@ public class ConstructorStandingService
         _logger.LogInformation("Checking cache for constructor standings for season {Season}", season);
         
         // Check if we should fetch based on staleness
-        var shouldFetch = await ShouldFetchConstructorStandingsAsync(season);
+        var shouldFetch = await _cacheStalenessService.ShouldFetchAsync(season, DataType.ConstructorStandings, CacheStalenessOptions.ForStandings);
         
         if (!shouldFetch)
         {
@@ -50,51 +50,6 @@ public class ConstructorStandingService
 
         _logger.LogInformation("Cache stale or missing for season {Season}, fetching from API", season);
         return await GetConstructorStandingsBySeasonAsync(season);
-    }
-    
-    private async Task<bool> ShouldFetchConstructorStandingsAsync(string season)
-    {
-        // Check metadata for last fetch time
-        var currentYear = DateTime.UtcNow.Year;
-        var seasonYear = int.Parse(season);
-        
-        // For past seasons, standings are final - less frequent fetching
-        TimeSpan cacheExpiration = seasonYear < currentYear 
-            ? TimeSpan.FromDays(7) 
-            : TimeSpan.FromHours(1); // Current season - check more frequently
-        
-        var metadata = await _metadataRepository.GetMetadataAsync(season, "ConstructorStandings");
-        
-        if (metadata == null || !metadata.FetchSuccessful)
-        {
-            _logger.LogDebug("No valid metadata for ConstructorStandings/{Season}, should fetch", season);
-            return true;
-        }
-        
-        var age = DateTime.UtcNow - metadata.LastFetchedAt;
-        if (age > cacheExpiration)
-        {
-            _logger.LogDebug("Constructor standings cache expired for season {Season} (age: {Age}), should fetch", season, age);
-            return true;
-        }
-        
-        // Check if there might be a new race since last fetch
-        var races = await _raceRepository.GetBySeasonAsync(season);
-        var racesSinceLastFetch = races
-            .Where(r => DateTime.TryParse(r.Date, out var raceDate) && 
-                       raceDate > metadata.LastFetchedAt &&
-                       raceDate < DateTime.UtcNow.AddDays(1)) // Race is in the past (with 1 day buffer)
-            .ToList();
-        
-        if (racesSinceLastFetch.Any())
-        {
-            _logger.LogInformation("Found {Count} race(s) since last fetch for season {Season}, should fetch constructor standings", 
-                racesSinceLastFetch.Count, season);
-            return true;
-        }
-        
-        _logger.LogDebug("Constructor standings cache valid for season {Season}, skip fetch", season);
-        return false;
     }
 
     public async Task<ConstructorStandingsList?> GetConstructorStandingsBySeasonAsync(string season)

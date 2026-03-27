@@ -47,7 +47,7 @@ public class ForceRefreshStandingsTest : IDisposable
         
         var httpClient = new HttpClient();
         _driverStandingService = new DriverStandingService(httpClient, driverStandingRepo, metadataRepository, cacheStalenessService, NullLogger<DriverStandingService>.Instance);
-        _constructorStandingService = new ConstructorStandingService(httpClient, constructorStandingRepo, metadataRepository, raceRepository, NullLogger<ConstructorStandingService>.Instance);
+        _constructorStandingService = new ConstructorStandingService(httpClient, constructorStandingRepo, metadataRepository, cacheStalenessService, NullLogger<ConstructorStandingService>.Instance);
     }
 
     [Fact]

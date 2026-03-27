@@ -1,2 +1,4 @@
 <Solution>
+  <Project Path="F1Fantasy\F1Fantasy.csproj" />
+  <Project Path="F1Fantasy.Tests\F1Fantasy.Tests.csproj" />
 </Solution>

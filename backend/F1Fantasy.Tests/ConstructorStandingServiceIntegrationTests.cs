@@ -35,7 +35,10 @@ public class ConstructorStandingServiceIntegrationTests : IDisposable
 
         _repository = new ConstructorStandingRepository(_context, _repositoryLogger);
         _httpClient = new HttpClient();
-        _service = new ConstructorStandingService(_httpClient, _repository, new DataFetchMetadataRepository(_context, NullLogger<DataFetchMetadataRepository>.Instance), new RaceRepository(_context, NullLogger<RaceRepository>.Instance), _serviceLogger);
+        var metadataRepository = new DataFetchMetadataRepository(_context, NullLogger<DataFetchMetadataRepository>.Instance);
+        var raceRepository = new RaceRepository(_context, NullLogger<RaceRepository>.Instance);
+        var cacheStalenessService = new CacheStalenessService(metadataRepository, raceRepository, NullLogger<CacheStalenessService>.Instance);
+        _service = new ConstructorStandingService(_httpClient, _repository, metadataRepository, cacheStalenessService, _serviceLogger);
     }
 
     [Fact]
