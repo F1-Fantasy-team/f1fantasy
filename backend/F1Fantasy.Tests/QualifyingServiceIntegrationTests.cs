@@ -44,7 +44,7 @@ public class QualifyingServiceIntegrationTests : IDisposable
             .Options;
         _context = new F1FantasyDbContext(options);
         _qualifyingRepository = new QualifyingRepository(_context, NullLogger<QualifyingRepository>.Instance);
-        _qualifyingService = new QualifyingService(_httpClient, _qualifyingRepository, NullLogger<QualifyingService>.Instance);
+        _qualifyingService = new QualifyingService(_httpClient, _qualifyingRepository, new DataFetchMetadataRepository(_context, NullLogger<DataFetchMetadataRepository>.Instance), new RaceRepository(_context, NullLogger<RaceRepository>.Instance), NullLogger<QualifyingService>.Instance);
     }
 
     [Fact]

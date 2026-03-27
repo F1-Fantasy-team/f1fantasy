@@ -70,12 +70,14 @@ public class Round2DataDiagnosticTests : IDisposable
         _standingRepository = new StandingRepository(contextFactory.CreateDbContext());
         
         // Initialize HTTP client and services
+        var cacheStalenessService = new CacheStalenessService(_metadataRepository, _raceRepository, NullLogger<CacheStalenessService>.Instance);
+        
         _httpClient = new HttpClient();
         _resultService = new ResultService(_httpClient, _resultRepository, _metadataRepository, _raceRepository, NullLogger<ResultService>.Instance);
         _raceService = new RaceService(_httpClient, _raceRepository, _metadataRepository, NullLogger<RaceService>.Instance);
-        _qualifyingService = new QualifyingService(_httpClient, _qualifyingRepository, NullLogger<QualifyingService>.Instance);
-        _driverStandingService = new DriverStandingService(_httpClient, _driverStandingRepository, NullLogger<DriverStandingService>.Instance);
-        _constructorStandingService = new ConstructorStandingService(_httpClient, _constructorStandingRepository, NullLogger<ConstructorStandingService>.Instance);
+        _qualifyingService = new QualifyingService(_httpClient, _qualifyingRepository, _metadataRepository, _raceRepository, NullLogger<QualifyingService>.Instance);
+        _driverStandingService = new DriverStandingService(_httpClient, _driverStandingRepository, _metadataRepository, cacheStalenessService, NullLogger<DriverStandingService>.Instance);
+        _constructorStandingService = new ConstructorStandingService(_httpClient, _constructorStandingRepository, _metadataRepository, _raceRepository, NullLogger<ConstructorStandingService>.Instance);
         
         _scoringService = new ScoringService(
             _predictionRepository,

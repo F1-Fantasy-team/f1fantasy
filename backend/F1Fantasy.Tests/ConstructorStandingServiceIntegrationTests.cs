@@ -5,6 +5,7 @@ using F1Fantasy.Services;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace F1Fantasy.Tests;
@@ -34,7 +35,7 @@ public class ConstructorStandingServiceIntegrationTests : IDisposable
 
         _repository = new ConstructorStandingRepository(_context, _repositoryLogger);
         _httpClient = new HttpClient();
-        _service = new ConstructorStandingService(_httpClient, _repository, _serviceLogger);
+        _service = new ConstructorStandingService(_httpClient, _repository, new DataFetchMetadataRepository(_context, NullLogger<DataFetchMetadataRepository>.Instance), new RaceRepository(_context, NullLogger<RaceRepository>.Instance), _serviceLogger);
     }
 
     [Fact]
