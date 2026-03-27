@@ -2,6 +2,427 @@
 
 ASP.NET Core Web API for F1 Fantasy application with PostgreSQL database.
 
+## Technical Specifications
+
+### System Architecture
+
+```mermaid
+graph TB
+    subgraph "Client Layer"
+        Client[Web Client]
+    end
+    
+    subgraph "ASP.NET Core API"
+        subgraph "Middleware Pipeline"
+            M1[Request Logging]
+            M2[Response Compression]
+            M3[Cache Headers]
+            M4[IP Blacklist]
+            M5[Exception Handler]
+            M6[Rate Limiter]
+            M7[Authentication JWT]
+        end
+        
+        subgraph "Controllers"
+            FC[F1 Data Controllers<br/>Race, Driver, Constructor, etc.]
+            GC[Fantasy Controllers<br/>Groups, Predictions, Standings]
+            AC[Admin Controllers<br/>Blacklist, Health]
+        end
+        
+        subgraph "Services"
+            F1S[F1 Data Services<br/>12 Services]
+            FS[Fantasy Services<br/>Group, Prediction, Scoring, Standings]
+            IS[Infrastructure Services<br/>Clerk, Cache, API Client]
+            BS[Background Services<br/>AutoLock]
+        end
+        
+        subgraph "Repository Layer"
+            DR[Data Repositories<br/>Race, Driver, Constructor, etc.]
+            FR[Fantasy Repositories<br/>Group, Prediction, Standing]
+            MR[Metadata Repository<br/>Fetch History, Cache]
+        end
+    end
+    
+    subgraph "External Services"
+        Ergast[Ergast F1 API<br/>jolpi.ca]
+        Clerk[Clerk Auth<br/>Multi-Instance]
+    end
+    
+    subgraph "Data Storage"
+        PG[(PostgreSQL<br/>Connection Pool 10-100)]
+        MC[Memory Cache<br/>Display Names]
+    end
+    
+    Client --> M1
+    M1 --> M2 --> M3 --> M4 --> M5 --> M6 --> M7
+    M7 --> FC & GC & AC
+    
+    FC --> F1S
+    GC --> FS
+    AC --> IS
+    
+    F1S --> DR & MR
+    FS --> FR & MR
+    IS --> MR
+    
+    DR & FR & MR --> PG
+    IS --> MC
+    BS --> FR
+    
+    F1S -.HTTP.-> Ergast
+    M7 & IS -.JWT Validation.-> Clerk
+    
+    style M4 fill:#ffcccc
+    style M6 fill:#ffcccc
+    style M7 fill:#ccffcc
+    style Clerk fill:#ccffcc
+```
+
+### Request Processing Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant MW as Middleware Pipeline
+    participant Auth as Authentication
+    participant Ctrl as Controller
+    participant Svc as Service
+    participant Cache as Cache Layer
+    participant DB as PostgreSQL
+    participant API as Ergast API
+    
+    C->>MW: HTTP Request
+    MW->>MW: Request Logging (ID + Stopwatch)
+    MW->>MW: Check IP Blacklist
+    alt IP Blacklisted
+        MW-->>C: 403 Forbidden
+    end
+    
+    MW->>MW: Apply Rate Limit
+    alt Rate Limit Exceeded
+        MW-->>C: 429 Too Many Requests
+    end
+    
+    MW->>Auth: Validate JWT Token
+    Auth->>Auth: Check Multi-Instance Clerk
+    alt Invalid Token
+        Auth-->>C: 401 Unauthorized
+    end
+    
+    Auth->>Ctrl: Authorized Request
+    Ctrl->>Svc: Service Method Call
+    
+    Svc->>Cache: Check DB Cache
+    Cache->>DB: Query Cached Data
+    DB-->>Cache: Return Data + Metadata
+    
+    Cache->>Cache: Evaluate Staleness<br/>(Past: 7d, Current: 1h)
+    
+    alt Cache Valid
+        Cache-->>Svc: Return Cached Data
+    else Cache Stale/Missing
+        Svc->>API: Fetch from Ergast API
+        API->>API: Apply Rate Limit<br/>(100ms polite delay)
+        alt API Success
+            API-->>Svc: Return Fresh Data
+            Svc->>DB: Update Cache + Metadata
+        else API Failure (429)
+            API->>API: Exponential Backoff<br/>(500ms → 8s, max 5 retries)
+            alt Retry Success
+                API-->>Svc: Return Data
+            else All Retries Failed
+                Svc-->>Ctrl: Return Cached Data (Fallback)
+            end
+        end
+    end
+    
+    Svc-->>Ctrl: Return Data
+    Ctrl->>MW: HTTP Response
+    MW->>MW: Set Cache Headers
+    MW->>MW: Compress Response (Brotli/Gzip)
+    MW->>MW: Log Duration
+    MW-->>C: Final Response
+```
+
+### Service Layer Architecture
+
+```mermaid
+graph LR
+    subgraph "F1 Data Services"
+        RS[RaceService]
+        DS[DriverService]
+        CS[ConstructorService]
+        ResS[ResultService]
+        QS[QualifyingService]
+        PS[PitStopService]
+        LS[LapTimingService]
+        DSS[DriverStandingService]
+        CSS[ConstructorStandingService]
+        StS[StatusService]
+        SS[SeasonService]
+        CiS[CircuitService]
+    end
+    
+    subgraph "Fantasy Services"
+        GS[GroupService]
+        PrS[PredictionService]
+        ScS[ScoringService]
+        StdS[StandingsService]
+    end
+    
+    subgraph "Infrastructure Services"
+        ClerkS[ClerkService<br/>3-Tier Cache]
+        CacheS[CacheStalenessService<br/>Smart Expiration]
+        ApiC[ApiHttpClient<br/>Retry + Backoff]
+        BL[IpBlacklistService<br/>Thread-Safe]
+        PST[PaginationStateTracker<br/>Singleton]
+        RVM[RateLimitViolationMonitor<br/>Auto-Blacklist]
+    end
+    
+    subgraph "Shared Dependencies"
+        HC[HttpClient]
+        MemC[MemoryCache]
+        DBCtx[DbContext/Factory]
+    end
+    
+    RS & DS & CS & ResS & QS & PS & LS & DSS & CSS & StS & SS & CiS --> ApiC
+    RS & DS & CS & ResS & QS & PS & LS & DSS & CSS & StS & SS & CiS --> CacheS
+    RS & DS & CS & ResS & QS & PS & LS & DSS & CSS & StS & SS & CiS --> DBCtx
+    
+    GS & PrS & ScS & StdS --> DBCtx
+    ScS --> ResS & QS & DSS & CSS
+    StdS --> ScS
+    
+    ClerkS --> MemC
+    ClerkS --> DBCtx
+    ApiC --> HC
+    ApiC --> PST
+    CacheS --> DBCtx
+    BL & RVM --> MemC
+    
+    style ApiC fill:#ffe6cc
+    style CacheS fill:#ffe6cc
+    style ClerkS fill:#e6ccff
+```
+
+### Data Flow & Caching Strategy
+
+```mermaid
+flowchart TD
+    Start([API Request]) --> CheckAuth{JWT Valid?}
+    CheckAuth -->|No| Unauth[401 Unauthorized]
+    CheckAuth -->|Yes| CheckCache{Check DB Cache}
+    
+    CheckCache --> EvalStale{Evaluate Staleness}
+    
+    EvalStale -->|Past Season<br/>< 7 days old| ReturnCache[Return Cached Data]
+    EvalStale -->|Current Season<br/>< 1 hour old| ReturnCache
+    EvalStale -->|Stale or Missing| FetchAPI[Fetch from Ergast API]
+    
+    FetchAPI --> CheckResponse{API Response}
+    CheckResponse -->|Success| UpdateDB[Update DB Cache]
+    CheckResponse -->|429 Rate Limit| Backoff[Exponential Backoff<br/>500ms → 8s]
+    CheckResponse -->|Error| CheckRetry{Retries < 5?}
+    
+    Backoff --> CheckRetry
+    CheckRetry -->|Yes| FetchAPI
+    CheckRetry -->|No| Fallback[Return Stale Cache<br/>if available]
+    
+    UpdateDB --> UpdateMeta[Update DataFetchMetadata<br/>timestamp, success]
+    UpdateMeta --> ReturnFresh[Return Fresh Data]
+    
+    ReturnCache --> SetHeaders[Set Cache-Control Headers]
+    ReturnFresh --> SetHeaders
+    Fallback --> SetHeaders
+    
+    SetHeaders --> Compress[Compress Response<br/>Brotli/Gzip]
+    Compress --> End([Return to Client])
+    
+    style CheckCache fill:#cce6ff
+    style UpdateDB fill:#cce6ff
+    style Backoff fill:#ffcccc
+    style Fallback fill:#ffffcc
+```
+
+### Database Schema
+
+```mermaid
+erDiagram
+    Race ||--o{ Result : "has many"
+    Race ||--o{ Qualifying : "has many"
+    Race ||--o{ PitStop : "has many"
+    Race ||--o{ LapTiming : "has many"
+    Race {
+        int Season PK
+        int Round PK
+        string RaceName
+        json Circuit
+        json Sessions
+        datetime Date
+    }
+    
+    Driver ||--o{ Result : "has many"
+    Driver ||--o{ DriverStanding : "has many"
+    Driver {
+        string DriverId PK
+        string GivenName
+        string FamilyName
+        string Nationality
+        string Code
+        int PermanentNumber
+    }
+    
+    Constructor ||--o{ Result : "has many"
+    Constructor ||--o{ ConstructorStanding : "has many"
+    Constructor {
+        string ConstructorId PK
+        string Name
+        string Nationality
+    }
+    
+    Result {
+        int ResultId PK
+        int Season FK
+        int Round FK
+        string DriverId FK
+        string ConstructorId FK
+        int Position
+        bool IsSprint
+    }
+    
+    Group ||--o{ GroupMember : "has many"
+    Group ||--o{ Prediction : "has many"
+    Group ||--o{ Standing : "has many"
+    Group {
+        int GroupId PK
+        string Name
+        string InviteCode UK
+        string AdminUserId
+        string LockMode
+        bool PredictionsLocked
+    }
+    
+    GroupMember {
+        int GroupMemberId PK
+        int GroupId FK
+        string UserId
+    }
+    
+    Prediction {
+        int PredictionId PK
+        int GroupId FK
+        string UserId
+        string PredictionType
+        json PredictionData
+        datetime CreatedAt
+        datetime UpdatedAt
+    }
+    
+    Standing {
+        int StandingId PK
+        int GroupId FK
+        string UserId
+        int TotalScore
+        int Rank
+        json CategoryScoresJson
+        datetime LastRecalculated
+    }
+    
+    DataFetchMetadata {
+        int Id PK
+        int Season
+        string DataType
+        datetime LastFetched
+        bool Success
+    }
+    
+    UserDisplayNameCache {
+        string UserId PK
+        string DisplayName
+        datetime ExpiresAt
+    }
+```
+
+### Authentication & Security Layers
+
+```mermaid
+flowchart TD
+    Request[Incoming Request] --> Layer1{Layer 1:<br/>IP Blacklist}
+    
+    Layer1 -->|Blacklisted| Block1[403 Forbidden]
+    Layer1 -->|Allowed| Layer2{Layer 2:<br/>Rate Limiting}
+    
+    Layer2 -->|Exceeded| RateCheck[Violation Monitor<br/>Track violations]
+    RateCheck --> CountCheck{10+ violations<br/>in 5 minutes?}
+    CountCheck -->|Yes| AutoBlock[Auto-Blacklist IP<br/>1 hour timeout]
+    CountCheck -->|No| Block2[429 Too Many Requests]
+    AutoBlock --> Block2
+    
+    Layer2 -->|Within Limit| Layer3{Layer 3:<br/>JWT Authentication}
+    
+    Layer3 -->|Missing/Invalid| Block3[401 Unauthorized]
+    Layer3 -->|Valid| Layer4[Layer 4:<br/>Multi-Instance Validation]
+    
+    Layer4 --> ClerkCheck{Check Clerk Instance}
+    ClerkCheck -->|Production| ProdJWT[Validate against<br/>clerk.f1fantasy.no]
+    ClerkCheck -->|Development| DevJWT[Validate against<br/>clerk.accounts.dev]
+    
+    ProdJWT & DevJWT --> Layer5{Layer 5:<br/>Authorization}
+    
+    Layer5 -->|Role Missing| Block4[403 Forbidden]
+    Layer5 -->|Authorized| Success[Process Request]
+    
+    Success --> Controller[Route to Controller]
+    
+    style Layer1 fill:#ffcccc
+    style Layer2 fill:#ffcccc
+    style Layer3 fill:#ccffcc
+    style Layer4 fill:#ccffcc
+    style Layer5 fill:#cce6ff
+    style AutoBlock fill:#ff9999
+```
+
+### Background Services & Automation
+
+```mermaid
+sequenceDiagram
+    participant Timer as Timer (5 min interval)
+    participant AutoLock as AutoLockService
+    participant GroupRepo as GroupRepository
+    participant RaceRepo as RaceRepository
+    participant DB as PostgreSQL
+    
+    loop Every 5 Minutes
+        Timer->>AutoLock: Execute Scheduled Task
+        AutoLock->>GroupRepo: Get All Groups
+        GroupRepo->>DB: Query Groups
+        DB-->>GroupRepo: Return Groups List
+        GroupRepo-->>AutoLock: Groups Data
+        
+        loop For Each Group
+            AutoLock->>AutoLock: Check if PredictionsLocked = false
+            alt Not Yet Locked
+                AutoLock->>RaceRepo: Get Current Season Races
+                RaceRepo->>DB: Query Races for 2026
+                DB-->>RaceRepo: Return Race Schedule
+                RaceRepo-->>AutoLock: Race Schedule
+                
+                AutoLock->>AutoLock: Find First Race
+                AutoLock->>AutoLock: Check if Date <= Now
+                
+                alt First Race Started
+                    AutoLock->>GroupRepo: Lock Group Predictions
+                    GroupRepo->>DB: UPDATE PredictionsLocked = true
+                    DB-->>GroupRepo: Confirm Update
+                    AutoLock->>AutoLock: Log: Group {id} auto-locked
+                end
+            end
+        end
+        
+        AutoLock-->>Timer: Await Next Interval
+    end
+```
+
 ## Prerequisites
 
 - .NET 10.0 SDK
