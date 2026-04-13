@@ -170,3 +170,24 @@ frontEnd/f1-fantasy/*.tsbuildinfo
 !.vscode/launch.json
 !.vscode/extensions.json
 frontEnd/f1-fantasy/env
+
+# Java / Maven
+backendJava/**/target/
+*.class
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+.classpath
+.project
+.settings/
+.factorypath
+*.log
+*.ctx
+.DS_Store
+**/*.hprof
+**/*.jfr
+backendJava/**/.vscode/

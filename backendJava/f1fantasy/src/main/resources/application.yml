@@ -1,0 +1,148 @@
+spring:
+  application:
+    name: f1fantasy
+
+  # ── Database ─────────────────────────────────────────────────────────
+  datasource:
+    url: ${ConnectionStrings__DefaultConnection}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      minimum-idle: 10
+      maximum-pool-size: 100
+      idle-timeout: 60000          # 60 seconds
+      connection-timeout: 30000    # 30 seconds
+      max-lifetime: 600000         # 10 minutes
+      connection-test-query: SELECT 1
+
+  # ── JPA ──────────────────────────────────────────────────────────────
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: validate            # schema owned by .NET EF Core migrations
+      naming:
+        physical-strategy: no.f1fantasy.config.EfCoreNamingStrategy
+    show-sql: false
+    properties:
+      hibernate:
+        default_schema: public
+        globally_quoted_identifiers: true   # match EF Core/Npgsql quoted PascalCase identifiers
+        jdbc:
+          time_zone: UTC
+
+  # ── Jackson ──────────────────────────────────────────────────────────
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+
+  # ── Cache ─────────────────────────────────────────────────────────────
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=30m
+
+  # ── Kafka (disabled by default — scaffold only) ───────────────────────
+  kafka:
+    bootstrap-servers: none
+    template:
+      default-topic: f1-data-updates
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: f1fantasy-consumer
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "no.f1fantasy.kafka"
+
+f1:
+  kafka:
+    topic: f1-data-updates
+    consumer:
+      enabled: false
+      group-id: f1fantasy-consumer
+
+  # ── Security / OAuth2 ─────────────────────────────────────────────────
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Overridden programmatically by MultiClerkJwtDecoder.
+          # Listed here for documentation purposes only.
+          issuer-uri: https://clerk.f1fantasy.no
+
+# ── Server ───────────────────────────────────────────────────────────────
+server:
+  port: ${PORT:8080}
+  servlet:
+    context-path: /
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/plain
+    min-response-size: 1024
+  tomcat:
+    max-connections: 100
+    accept-count: 50
+    threads:
+      max: 100
+      min-spare: 10
+
+# ── External APIs ─────────────────────────────────────────────────────────
+ergast:
+  base-url: https://api.jolpi.ca/ergast/f1/
+  page-size: 30
+  polite-delay-ms: 100
+  retry:
+    max-attempts: 5
+    initial-interval-ms: 500
+    multiplier: 2.0
+
+# ── Clerk ─────────────────────────────────────────────────────────────────
+clerk:
+  secret-key: ${CLERK_SECRET_KEY}
+  issuers:
+    - https://clerk.f1fantasy.no
+    - https://above-stag-28.clerk.accounts.dev
+  jwks-cache-hours: 24
+
+# ── Rate Limiting (Bucket4j) ──────────────────────────────────────────────
+rate-limit:
+  read:
+    capacity: 60
+    refill-tokens: 60
+    refill-period-seconds: 60
+  write:
+    capacity: 20
+    refill-tokens: 20
+    refill-period-seconds: 60
+  admin:
+    capacity: 10
+    refill-tokens: 10
+    refill-period-seconds: 60
+  violation-threshold: 10
+  violation-window-minutes: 5
+
+# ── OpenAPI ───────────────────────────────────────────────────────────────
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+
+# ── Logging ───────────────────────────────────────────────────────────────
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSS'Z'} [%thread] [%X{requestId}] %-5level %logger{36} - %msg%n"
+  level:
+    root: INFO
+    no.f1fantasy: INFO
+
+app:
+  kafka:
+    topics:
+      group-events: f1.group.events
+      prediction-events: f1.prediction.events
