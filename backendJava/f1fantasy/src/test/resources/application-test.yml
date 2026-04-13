@@ -1,0 +1,43 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;INIT=CREATE DOMAIN IF NOT EXISTS JSONB AS JSON
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        default_schema: PUBLIC
+        globally_quoted_identifiers: true
+
+  # Disable Kafka during tests
+  kafka:
+    bootstrap-servers: none
+    listener:
+      auto-startup: false
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri:   # overridden by test bean
+
+clerk:
+  secret-key: test-secret-key
+  issuers:
+    - http://localhost:${wiremock.port:8089}/clerk-prod
+    - http://localhost:${wiremock.port:8089}/clerk-dev
+  jwks-cache-hours: 0   # disable cache in tests
+
+ergast:
+  base-url: http://localhost:${wiremock.port:8089}/ergast
+
+logging:
+  level:
+    no.f1fantasy: DEBUG
+    org.hibernate.SQL: DEBUG

@@ -1,0 +1,17 @@
+spring:
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  # In development, allow schema validation to be skipped if .env is missing
+  jpa-override:
+    ddl-auto: update
+
+# More verbose logging in development
+logging:
+  level:
+    no.f1fantasy: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
