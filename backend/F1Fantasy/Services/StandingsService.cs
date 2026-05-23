@@ -42,6 +42,10 @@ public class StandingsService
 
     public async Task<List<Standing>> GetStandingsWithAutoRecalcAsync(int groupId, string season)
     {
+        // Refresh F1 data if a race has happened since last fetch.
+        // CacheStalenessService decides whether to hit Ergast — no-op if cache is still valid.
+        await _scoringService.EnsureSeasonDataAvailableAsync(season);
+
         // Get existing standings
         var existingStandings = await _standingRepository.GetStandingsByGroupAsync(groupId);
         
