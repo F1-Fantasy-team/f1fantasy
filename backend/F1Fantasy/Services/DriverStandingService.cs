@@ -45,7 +45,7 @@ public class DriverStandingService
                 // Convert DriverStanding to DriverStandingEntry
                 // Note: Driver navigation property is not loaded from DB, so we create it from DriverId
                 var driverStandingEntries = cachedStandings
-                    .OrderBy(s => int.Parse(s.Position))
+                    .OrderBy(s => int.TryParse(s.Position, out var pos) ? pos : 99)
                     .Select(s => new DriverStandingEntry
                     {
                         Position = s.Position,

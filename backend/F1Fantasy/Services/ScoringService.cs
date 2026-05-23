@@ -1,6 +1,7 @@
 using F1Fantasy.Models;
 using F1Fantasy.Repository;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 
 namespace F1Fantasy.Services;
 
@@ -47,15 +48,18 @@ public class ScoringService
     /// </summary>
     public async Task EnsureSeasonDataAvailableAsync(string season)
     {
+        // Refresh race calendar first — CacheStalenessService uses it to detect new races
+        await _raceService.GetRacesForSeasonAsync(season);
+
         // Fetch driver standings (will use cache if available, otherwise API)
         await _driverStandingService.GetDriverStandingsBySeasonCachedAsync(season);
-        
+
         // Fetch constructor standings
         await _constructorStandingService.GetConstructorStandingsBySeasonCachedAsync(season);
-        
+
         // Fetch qualifying data
         await _qualifyingService.GetQualifyingBySeasonCachedAsync(season);
-        
+
         // Fetch race results
         await _resultService.GetResultsBySeasonCachedAsync(season);
     }
@@ -273,15 +277,15 @@ public class ScoringService
             var driverStanding = standingsList.DriverStandings.FirstOrDefault(s => s.Driver?.DriverId == driverId);
             if (driverStanding != null)
             {
-                var points = int.Parse(driverStanding.Points);
+                if (!int.TryParse(driverStanding.Points, out var points))
+                    points = 0;
+
                 if (points == 0)
                 {
-                    // Correct prediction: driver has 0 points
                     totalScore += ZERO_POINTER_POINTS;
                 }
                 else
                 {
-                    // Incorrect prediction: driver has points
                     totalScore += ZERO_POINTER_PENALTY;
                 }
             }
@@ -399,7 +403,9 @@ public class ScoringService
             var driverStanding = driverStandings.DriverStandings.FirstOrDefault(s => s.Driver?.DriverId == driverId);
             if (driverStanding != null)
             {
-                var points = int.Parse(driverStanding.Points);
+                if (!int.TryParse(driverStanding.Points, out var points))
+                    points = 0;
+
                 if (points == 0)
                 {
                     totalScore += ZERO_POINTER_POINTS;
@@ -871,7 +877,7 @@ public class ScoringService
         if (!int.TryParse(parts[0], out var minutes))
             return null;
         
-        if (!double.TryParse(parts[1], out var seconds))
+        if (!double.TryParse(parts[1], NumberStyles.Any, CultureInfo.InvariantCulture, out var seconds))
             return null;
         
         return TimeSpan.FromMinutes(minutes) + TimeSpan.FromSeconds(seconds);

@@ -62,8 +62,12 @@ public class CacheStalenessService
         
         // Time-based expiration
         var currentYear = DateTime.UtcNow.Year;
-        var seasonYear = int.Parse(season);
-        var cacheExpiration = seasonYear < currentYear 
+        if (!int.TryParse(season, out var seasonYear))
+        {
+            _logger.LogWarning("Season '{Season}' is not a valid year, treating as current season", season);
+            seasonYear = currentYear;
+        }
+        var cacheExpiration = seasonYear < currentYear
             ? options.PastSeasonExpiration 
             : options.CurrentSeasonExpiration;
         
@@ -80,9 +84,9 @@ public class CacheStalenessService
         {
             var races = await _raceRepository.GetBySeasonAsync(season);
             var racesSinceLastFetch = races
-                .Where(r => DateTime.TryParse(r.Date, out var raceDate) && 
+                .Where(r => DateTime.TryParse(r.Date, out var raceDate) &&
                            raceDate > metadata.LastFetchedAt &&
-                           raceDate < DateTime.UtcNow.Add(options.RaceDataAvailabilityBuffer))
+                           raceDate.Add(options.RaceDataAvailabilityBuffer) < DateTime.UtcNow)
                 .ToList();
             
             if (racesSinceLastFetch.Any())

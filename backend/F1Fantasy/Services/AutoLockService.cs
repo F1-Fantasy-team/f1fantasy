@@ -1,6 +1,7 @@
 using F1Fantasy.Repository;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Globalization;
 
 namespace F1Fantasy.Services;
 
@@ -55,8 +56,11 @@ public class AutoLockService : BackgroundService
             return;
         }
 
-        // Parse first race date
-        if (!DateTime.TryParse(firstRace.Date, out var firstRaceDate))
+        // Parse first race date as UTC midnight (Ergast format: "yyyy-MM-dd")
+        if (!DateTime.TryParseExact(firstRace.Date, "yyyy-MM-dd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out var firstRaceDate))
         {
             _logger.LogWarning("Could not parse race date: {Date}", firstRace.Date);
             return;

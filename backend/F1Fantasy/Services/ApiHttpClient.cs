@@ -4,7 +4,7 @@ namespace F1Fantasy.Services;
 
 /// <summary>
 /// HTTP client wrapper that handles rate limiting and retries for the Ergast F1 API
-/// Implements exponential backoff when hitting rate limits (429 errors)
+/// Implements exponential backoff with jitter when hitting rate limits (429 errors)
 /// and adds polite delays between requests to avoid overwhelming the API
 /// </summary>
 public class ApiHttpClient
@@ -12,7 +12,7 @@ public class ApiHttpClient
     private readonly HttpClient _httpClient;
     private const int MaxRetries = 5;
     private const int InitialDelayMs = 500;
-    private const int PoliteDelayMs = 100; // Delay between requests to be polite to the API
+    private const int PoliteDelayMs = 100;
     private static readonly SemaphoreSlim _rateLimiter = new SemaphoreSlim(1, 1);
     private static DateTime _lastRequestTime = DateTime.MinValue;
 
@@ -22,9 +22,10 @@ public class ApiHttpClient
     }
 
     /// <summary>
-    /// Makes an HTTP GET request with automatic retry on rate limit errors (429)
-    /// Uses exponential backoff: 500ms, 1s, 2s, 4s, 8s
-    /// Also enforces a polite delay between all requests to avoid hitting rate limits
+    /// Makes an HTTP GET request with automatic retry on rate limit errors (429).
+    /// Uses exponential backoff with ±10% jitter to avoid thundering herd:
+    /// ~500ms, ~1s, ~2s, ~4s, ~8s
+    /// Also enforces a polite delay between all requests to avoid hitting rate limits.
     /// </summary>
     public async Task<string> GetStringWithRetryAsync(string url)
     {
@@ -52,17 +53,15 @@ public class ApiHttpClient
 
                 var response = await _httpClient.GetAsync(url);
 
-                // If we got rate limited, retry with exponential backoff
                 if (response.StatusCode == HttpStatusCode.TooManyRequests)
                 {
                     attempt++;
                     if (attempt >= MaxRetries)
                     {
-                        response.EnsureSuccessStatusCode(); // Will throw on 429
+                        response.EnsureSuccessStatusCode(); // throws on final 429
                     }
 
-                    // Exponential backoff: 500ms, 1s, 2s, 4s, 8s
-                    var delayMs = InitialDelayMs * (int)Math.Pow(2, attempt - 1);
+                    var delayMs = ExponentialBackoffWithJitter(attempt);
                     Console.WriteLine($"Rate limit hit (429). Retrying in {delayMs}ms (attempt {attempt}/{MaxRetries})...");
                     await Task.Delay(delayMs);
                     continue;
@@ -79,12 +78,19 @@ public class ApiHttpClient
                     throw;
                 }
 
-                var delayMs = InitialDelayMs * (int)Math.Pow(2, attempt - 1);
+                var delayMs = ExponentialBackoffWithJitter(attempt);
                 Console.WriteLine($"Rate limit hit (429). Retrying in {delayMs}ms (attempt {attempt}/{MaxRetries})...");
                 await Task.Delay(delayMs);
             }
         }
 
         throw new HttpRequestException("Max retries exceeded");
+    }
+
+    private static int ExponentialBackoffWithJitter(int attempt)
+    {
+        var baseDelay = InitialDelayMs * (int)Math.Pow(2, attempt - 1);
+        var jitter = Random.Shared.Next(-(baseDelay / 10), (baseDelay / 10) + 1);
+        return Math.Max(0, baseDelay + jitter);
     }
 }

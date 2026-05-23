@@ -42,6 +42,10 @@ public class StandingsService
 
     public async Task<List<Standing>> GetStandingsWithAutoRecalcAsync(int groupId, string season)
     {
+        // Refresh F1 data if a race has happened since last fetch.
+        // CacheStalenessService decides whether to hit Ergast — no-op if cache is still valid.
+        await _scoringService.EnsureSeasonDataAvailableAsync(season);
+
         // Get existing standings
         var existingStandings = await _standingRepository.GetStandingsByGroupAsync(groupId);
         
@@ -57,66 +61,15 @@ public class StandingsService
             return await _standingRepository.GetStandingsByGroupAsync(groupId);
         }
         
-        // Use ResultService which will intelligently fetch from API only if needed
+        // If no results exist yet, nothing to calculate
         var latestRoundWithResults = await _resultService.GetLatestRoundWithResultsAsync(season);
-        
         if (latestRoundWithResults == null)
         {
             _logger.LogDebug("No race results available for season {Season}, returning existing standings", season);
             return existingStandings;
         }
-        
-        // Verify the latest round data is actually in our database
-        var latestRoundResults = await _resultRepository.GetByRaceAsync(season, latestRoundWithResults.Value.ToString());
-        if (!latestRoundResults.Any())
-        {
-            _logger.LogWarning("Latest round {Round} reported but no results in DB, forcing recalculation", latestRoundWithResults);
-            await RecalculateStandingsAsync(groupId, season);
-            return await _standingRepository.GetStandingsByGroupAsync(groupId);
-        }
-        
-        // Determine last calculated round from existing standings
-        int? lastCalculatedRound = null;
-        if (existingStandings.Any())
-        {
-            // Try to get the last calculated round from the first user's detailed scores
-            var firstStanding = existingStandings.First();
-            try
-            {
-                var detailedStanding = await _scoringService.CalculateDetailedScoresAsync(groupId, firstStanding.UserId, season);
-                if (detailedStanding.RoundScores.Any())
-                {
-                    lastCalculatedRound = detailedStanding.RoundScores.Max(rs => int.Parse(rs.Round));
-                    _logger.LogDebug("Last calculated round for group {GroupId}: {Round}", groupId, lastCalculatedRound);
-                    
-                    // Verify that the calculated round actually has results in DB
-                    var calculatedRoundResults = await _resultRepository.GetByRaceAsync(season, lastCalculatedRound.Value.ToString());
-                    if (!calculatedRoundResults.Any())
-                    {
-                        _logger.LogWarning("Last calculated round {Round} has no results in DB, forcing recalculation", lastCalculatedRound);
-                        lastCalculatedRound = null; // Force recalc
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Could not determine last calculated round, will recalculate");
-            }
-        }
-        
-        // Check if recalculation is needed
-        bool needsRecalc = lastCalculatedRound == null || lastCalculatedRound < latestRoundWithResults;
-        
-        if (needsRecalc)
-        {
-            _logger.LogInformation("Auto-recalculating standings for group {GroupId}, season {Season}. Last calculated: {LastRound}, Latest available: {LatestRound}",
-                groupId, season, lastCalculatedRound?.ToString() ?? "none", latestRoundWithResults);
-            
-            await RecalculateStandingsAsync(groupId, season);
-            return await _standingRepository.GetStandingsByGroupAsync(groupId);
-        }
-        
-        _logger.LogDebug("Standings for group {GroupId} are up to date (round {Round})", groupId, lastCalculatedRound);
+
+        _logger.LogDebug("Standings for group {GroupId} are up to date", groupId);
         return existingStandings;
     }
 
@@ -139,8 +92,8 @@ public class StandingsService
             // Get the timestamp of when standings were last calculated
             var standingsUpdatedAt = existingStandings.Max(s => s.UpdatedAt);
             
-            // Check if driver or constructor standings were fetched AFTER our standings were calculated
-            var dataTypes = new[] { "DriverStandings", "ConstructorStandings" };
+            // Check if any F1 data was fetched AFTER our standings were calculated
+            var dataTypes = new[] { "DriverStandings", "ConstructorStandings", "Results", "Qualifying" };
             
             foreach (var dataType in dataTypes)
             {
@@ -274,16 +227,16 @@ public class StandingsService
         if (group == null) throw new KeyNotFoundException("Group not found");
 
         var members = await _groupRepository.GetMembersAsync(groupId);
-        
-        // Parallelize detailed score calculation for all members
-        var detailedTasks = members.Select(async member =>
+
+        // Sequential to avoid concurrent DbContext access on shared repositories
+        // (same pattern as RecalculateStandingsAsync)
+        var results = new List<(DetailedStanding Detailed, DateTime CompletionTime)>();
+        foreach (var member in members)
         {
             var detailed = await _scoringService.CalculateDetailedScoresAsync(groupId, member.UserId, season);
             var completionTime = await GetUserPredictionCompletionTimeAsync(groupId, member.UserId);
-            return (Detailed: detailed, CompletionTime: completionTime);
-        }).ToList();
-
-        var results = await Task.WhenAll(detailedTasks);
+            results.Add((detailed, completionTime));
+        }
 
         // Sort by total score descending, then by earliest completion time
         var rankedStandings = results
