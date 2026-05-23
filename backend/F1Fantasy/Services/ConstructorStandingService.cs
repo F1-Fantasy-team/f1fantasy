@@ -86,6 +86,12 @@ public class ConstructorStandingService
             // Store in database
             foreach (var standingEntry in standingsList.ConstructorStandings)
             {
+                if (standingEntry.Constructor == null)
+                {
+                    _logger.LogWarning("Constructor standing entry missing constructor information, skipping");
+                    continue;
+                }
+
                 var standing = new ConstructorStanding
                 {
                     Season = standingsList.Season,
@@ -96,11 +102,11 @@ public class ConstructorStandingService
                     Points = standingEntry.Points,
                     Wins = standingEntry.Wins
                 };
-                
+
                 await _repository.AddOrUpdateAsync(standing);
             }
 
-            _logger.LogInformation("Successfully fetched and stored {Count} constructor standings for season {Season}", 
+            _logger.LogInformation("Successfully fetched and stored {Count} constructor standings for season {Season}",
                 standingsList.ConstructorStandings.Count, season);
 
             // Record fetch metadata
@@ -162,6 +168,12 @@ public class ConstructorStandingService
             // Store in database
             foreach (var standingEntry in standingsList.ConstructorStandings)
             {
+                if (standingEntry.Constructor == null)
+                {
+                    _logger.LogWarning("Constructor standing entry missing constructor information for round {Round}, skipping", round);
+                    continue;
+                }
+
                 var standing = new ConstructorStanding
                 {
                     Season = standingsList.Season,
@@ -172,11 +184,11 @@ public class ConstructorStandingService
                     Points = standingEntry.Points,
                     Wins = standingEntry.Wins
                 };
-                
+
                 await _repository.AddOrUpdateAsync(standing);
             }
 
-            _logger.LogInformation("Successfully fetched and stored {Count} constructor standings for season {Season} round {Round}", 
+            _logger.LogInformation("Successfully fetched and stored {Count} constructor standings for season {Season} round {Round}",
                 standingsList.ConstructorStandings.Count, season, round);
 
             return standingsList;
