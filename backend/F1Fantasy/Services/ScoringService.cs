@@ -48,15 +48,18 @@ public class ScoringService
     /// </summary>
     public async Task EnsureSeasonDataAvailableAsync(string season)
     {
+        // Refresh race calendar first — CacheStalenessService uses it to detect new races
+        await _raceService.GetRacesForSeasonAsync(season);
+
         // Fetch driver standings (will use cache if available, otherwise API)
         await _driverStandingService.GetDriverStandingsBySeasonCachedAsync(season);
-        
+
         // Fetch constructor standings
         await _constructorStandingService.GetConstructorStandingsBySeasonCachedAsync(season);
-        
+
         // Fetch qualifying data
         await _qualifyingService.GetQualifyingBySeasonCachedAsync(season);
-        
+
         // Fetch race results
         await _resultService.GetResultsBySeasonCachedAsync(season);
     }
